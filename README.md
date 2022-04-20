@@ -1,7 +1,7 @@
 MagNav
 ==============================
 
-Modeling aircraft magnetic disturbance fields arning.
+Modeling aircraft magnetic disturbance fields with deep learning.
 
 Project Organization
 ------------
