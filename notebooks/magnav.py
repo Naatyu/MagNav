@@ -77,7 +77,7 @@ Calculate root-mean-square error.
 **Returns:**
 - `err` : root-mean-squared error
 """
-def rmse(y_true, y_pred, subtract_mean=True):
+def rmse(y_pred, y_true, subtract_mean=True):
     
     if subtract_mean:
         err = np.sqrt(mean_squared_error(y_true - y_true.mean(), 
@@ -90,22 +90,19 @@ def rmse(y_true, y_pred, subtract_mean=True):
 """
 check_GPU()
 
-Check if GPU is available for training with PyTorch.
+Return training device for PyTorch.
 
 **Arguments:**
 - None
 
 **Returns:**
-- None
+- device : Return training device for PyTorch
 """
-def check_GPU():
-    
-    if torch.cuda.is_available() != True:
-        return print('Cuda is not available.')
-    
-    curr_device = torch.cuda.get_device_name(torch.cuda.current_device())
-    
-    return(print(f'GPU in use : {curr_device}'))
+def get_device():
+    dev = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Currently using {dev}")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    return device
     
 
 #---------------------------------#
