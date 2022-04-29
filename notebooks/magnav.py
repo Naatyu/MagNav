@@ -5,6 +5,7 @@ import random
 from sklearn.metrics import mean_squared_error
 from scipy import signal
 import torch
+import copy
 
 
 #-------------------------#
@@ -310,7 +311,7 @@ def create_TL_coef(Bx, By, Bz, meas, add_induced=True, add_eddy=True, lowcut=0.1
     A = create_TL_A(Bx,By,Bz,add_induced=add_induced,add_eddy=add_eddy)
     
     # filter each column of A
-    A_f = A
+    A_f = copy.deepcopy(A)
     for i in range(np.shape(A)[1]):
         if filter_params[0] == 'Butterworth':
             A_f[:,i] = apply_butter_filter(A[:,i],lowcut,highcut,fs,order=filter_params[1])
