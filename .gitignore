@@ -76,15 +76,7 @@ target/
 .ipynb_checkpoints/
 
 # exclude data from source control by default
-data/
-docs
-models
-reports
-src
-tox.ini
-test_environement.py
-setup.py
-Makefile
+/data/
 
 # Mac OS-specific storage files
 .DS_Store
