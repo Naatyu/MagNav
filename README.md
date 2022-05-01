@@ -19,7 +19,8 @@ This project aims to explore new solutions to use the sensors placed in the airc
 Project Data
 ------------
 The data used for this project comes from an MIT challenge :
-- https://magnav.mit.edu/ <br>
+- https://magnav.mit.edu/
+
 The data can be downloaded [here](https://zenodo.org/record/6327685#.Ym6QLodBxD8).
 
 Project Organization
