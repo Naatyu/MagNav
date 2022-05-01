@@ -77,10 +77,10 @@ target/
 
 # exclude data from source control by default
 /data/
-/docs/
-/models/
-/reports/
-/src/
+/docs
+/models
+/reports
+/src
 /tox.ini
 /test_environement.py
 /setup.py
