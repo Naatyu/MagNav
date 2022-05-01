@@ -85,7 +85,6 @@ target/
 /test_environement.py
 /setup.py
 /Makefile
-.gitignore
 
 # Mac OS-specific storage files
 .DS_Store
