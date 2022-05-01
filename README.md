@@ -14,7 +14,13 @@ but which cannot be jammed. This is where magnetic navigation comes in. In addit
 
 However, there is a current blocking element, the magnetic disturbance of the carrier. In order to navigate by means of the magnetic field of the earth, measurements of the magnetic field are made from the earth and a map of magnetic anomalies is referred to. However, the carrier from which the measurements are made emits magnetic disturbances. In order to obtain good measurements, it is necessary to be able to remove the carrier disturbance from the magnetometer measurements.<br> 
 There are currently some techniques such as placing the magnetometer on a pole at about 2-3 meters from the aircraft and then perform a Tolles-Lawson calibration. This is very impractical and imposes constraints. 
-This project aims to explore new solutions to use sensors placed in the aircraft. We are using deep learning based techniques.
+This project aims to explore new solutions to use the sensors placed in the aircraft by exploring new techniques such as deep learning.
+
+Project Data
+------------
+The data used for this project comes from an MIT challenge :
+- https://magnav.mit.edu/
+The data can be downloaded [here](https://zenodo.org/record/6327685#.Ym6QLodBxD8).
 
 Project Organization
 ------------
