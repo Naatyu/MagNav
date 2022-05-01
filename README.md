@@ -1,6 +1,9 @@
 Magnetic Navigation
 ==============================
 
+Introduction
+------------
+
 GPS navigation is very popular nowadays, but the problem is that the signal can be jammed. It is therefore necessary to implement methods with the same advantages, i.e:
 - Available in any weather
 - Available at any location
