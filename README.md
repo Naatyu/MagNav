@@ -20,10 +20,10 @@ This project aims to explore new solutions to use the sensors placed in the airc
 Project Data
 ------------
 
-The dataset is provided by the United States Air Force pursuant to Cooperative Agreement Number FA8750-19-2-1000.
+The dataset is provided by the United States Air Force pursuant to Cooperative Agreement Number FA8750-19-2-1000.<br>
 Albert R Gnadt, Joseph Belarge, Aaron Canciani, Lauren Conger, Joseph
 Curro, Alan Edelman, Peter Morales, Michael F O’Keeffe, Jonathan Taylor,
-and Christopher Rackauckas. [Signal enhancement for magnetic navigation challenge problem](https://arxiv.org/abs/2007.12158). * *arXiv e-prints* *, pages arXiv–2007, 2020.
+and Christopher Rackauckas. [Signal enhancement for magnetic navigation challenge problem](https://arxiv.org/abs/2007.12158). *arXiv e-prints*, pages arXiv–2007, 2020.
 
 The data used for this project comes from an [MIT challenge](https://magnav.mit.edu/). The data can be downloaded [here](https://zenodo.org/record/6327685#.Ym6QLodBxD8). The goal of the challenge is the same as the one of our project but we do not take into account their restrictions on the dataset.<br>
 
