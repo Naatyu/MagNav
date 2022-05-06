@@ -21,7 +21,7 @@ Project Data
 ------------
 
 The dataset is provided by the United States Air Force pursuant to Cooperative Agreement Number FA8750-19-2-1000.
-@misc{gnadt2020signal,
+@article{gnadt2020signal,
   title={Signal Enhancement for Magnetic Navigation Challenge Problem},
   author={Gnadt, Albert R and Belarge, Joseph and Canciani, Aaron and Conger, Lauren and Curro, Joseph and Edelman, Alan and Morales, Peter and O'Keeffe, Michael F and Taylor, Jonathan and Rackauckas, Christopher},
   journal={arXiv e-prints},
