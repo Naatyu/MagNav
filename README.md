@@ -1,4 +1,4 @@
-Magnetic Navigation
+Magnetic Navigation (currently in progress)
 ==============================
 Magnetic navigation project by Nathan Laoué supervised by Arnaud Lepers (DGA-MI/SYSNAV), Charly Faure (DGA-MI/IA2P) and Laure Deletraz (DGA-MI/IA2P).
 
@@ -21,7 +21,13 @@ Project Data
 ------------
 The data used for this project comes from an [MIT challenge](https://magnav.mit.edu/). The data can be downloaded [here](https://zenodo.org/record/6327685#.Ym6QLodBxD8). The goal of the challenge is the same as the one of our project but we do not take into account their restrictions on the dataset.<br>
 
-This dataset was created by [SGL](http://www.sgl.com/). They have made several flights by placing magnetometers in several places of the plane and especially a magnetometer on a pole at the end of the plane which will serve as truth. They also took measurements of various elements of the aircraft such as roll angle and battery voltage.
+This dataset was created by [SGL](http://www.sgl.com/). They have made several flights by placing magnetometers in several places of the plane and especially a magnetometer on a pole at the end of the plane which will serve as truth. They also took measurements of various elements of the aircraft such as roll angle and battery voltage.<br>
+
+In this project we use 3 different magnetic anomaly maps. Maps of Renfrew and Eastern area are provided with the dataset. For the map of Canada, it is available from this [link](http://gdr.agg.nrcan.gc.ca/gdrdap/dap/info-eng.php). Also for the world map of magnetic anomalies, it is available from this [link](http://wdmam.org/).
+
+How to run the Notebooks ?
+------------
+Once all the necessary data have been downloaded (link above), you msut put them in the data folder(GITlfts ?).
 
 Project Organization
 ------------
