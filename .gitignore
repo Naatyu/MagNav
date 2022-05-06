@@ -78,7 +78,9 @@ target/
 # exclude data from source control by default
 /data/interim
 /data/processed
-/data/raw
+/data/raw/Eastern_2.h5
+/data/raw/Flt1002-train.h5
+/data/raw/Flt1003-train.h5
 
 # Mac OS-specific storage files
 .DS_Store
