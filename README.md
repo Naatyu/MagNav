@@ -29,7 +29,9 @@ The data used for this project comes from an [MIT challenge](https://magnav.mit.
 
 This dataset was created by [SGL](http://www.sgl.com/). They have made several flights by placing magnetometers in several places of the plane and especially a magnetometer on a pole at the end of the plane which will serve as truth. They also took measurements of various elements of the aircraft such as roll angle and battery voltage.<br>
 
-In this project we use 3 different magnetic anomaly maps. Maps of Renfrew and Eastern area are provided with the dataset. For the map of Canada, it is available from this [link](http://gdr.agg.nrcan.gc.ca/gdrdap/dap/info-eng.php). Also for the world map of magnetic anomalies, it is available from this [link](http://wdmam.org/).
+In this project we use 3 different magnetic anomaly maps. Maps of Renfrew and Eastern area are provided with the dataset. For the map of Canada, it is available from this [link](http://gdr.agg.nrcan.gc.ca/gdrdap/dap/info-eng.php). Also for the world map of magnetic anomalies, it is available from this [link](http://wdmam.org/).<br>
+
+You can also download the IGRF model [here](https://earth-planets-space.springeropen.com/articles/10.1186/s40623-020-01288-x).
 
 How to run the Notebooks ?
 ------------
