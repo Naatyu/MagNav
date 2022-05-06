@@ -25,7 +25,7 @@ Albert R Gnadt, Joseph Belarge, Aaron Canciani, Lauren Conger, Joseph
 Curro, Alan Edelman, Peter Morales, Michael F O’Keeffe, Jonathan Taylor,
 and Christopher Rackauckas. [Signal enhancement for magnetic navigation challenge problem](/references/Signal%20Enhancement%20for%20Magnetic%20Navigation%20Challenge%20Problem.pdf). *arXiv e-prints*, pages arXiv–2007, 2020.
 
-The data used for this project comes from an [MIT challenge](https://magnav.mit.edu/). The data can be downloaded [here](https://zenodo.org/record/6327685#.Ym6QLodBxD8). The goal of the challenge is the same as the one of our project but we do not take into account their restrictions on the dataset. A datasheet of the data is avilable [here](references/Challenge%20problem%20datasheet.pdf)<br>
+The data used for this project comes from an [MIT challenge](https://magnav.mit.edu/). The data can be downloaded [here](https://zenodo.org/record/4271804#.YnWQuIdBxD8). The goal of the challenge is the same as the one of our project but we do not take into account their restrictions on the dataset. A datasheet of the data is available [here](references/Challenge%20problem%20datasheet.pdf)<br>
 
 This dataset was created by [SGL](http://www.sgl.com/). They have made several flights by placing magnetometers in several places of the plane and especially a magnetometer on a pole at the end of the plane which will serve as truth. They also took measurements of various elements of the aircraft such as roll angle and battery voltage.<br>
 
