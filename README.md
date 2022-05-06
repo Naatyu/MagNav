@@ -19,6 +19,15 @@ This project aims to explore new solutions to use the sensors placed in the airc
 
 Project Data
 ------------
+
+[DataSet Name] provided by the United States Air Force pursuant to Cooperative Agreement Number FA8750-19-2-1000 - [dates used]
+@article{gnadt2020signal,
+  title={Signal Enhancement for Magnetic Navigation Challenge Problem},
+  author={Gnadt, Albert R and Belarge, Joseph and Canciani, Aaron and Conger, Lauren and Curro, Joseph and Edelman, Alan and Morales, Peter and O'Keeffe, Michael F and Taylor, Jonathan and Rackauckas, Christopher},
+  journal={arXiv e-prints},
+  pages={arXiv--2007},
+  year={2020}
+}
 The data used for this project comes from an [MIT challenge](https://magnav.mit.edu/). The data can be downloaded [here](https://zenodo.org/record/6327685#.Ym6QLodBxD8). The goal of the challenge is the same as the one of our project but we do not take into account their restrictions on the dataset.<br>
 
 This dataset was created by [SGL](http://www.sgl.com/). They have made several flights by placing magnetometers in several places of the plane and especially a magnetometer on a pole at the end of the plane which will serve as truth. They also took measurements of various elements of the aircraft such as roll angle and battery voltage.<br>
