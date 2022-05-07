@@ -35,7 +35,7 @@ You can also download the IGRF model [here](https://earth-planets-space.springer
 
 How to run the Notebooks ?
 ------------
-Once all the necessary data have been downloaded (link above), you msut put them in the data folder(GITlfts ?).
+To use the same data as in this project, a kaggle dataset has been created. You just have to download the data from [here]() and paste the data in ```data/raw```.
 
 Project Organization
 ------------
