@@ -35,7 +35,7 @@ You can also download the IGRF model [here](https://earth-planets-space.springer
 
 How to run the Notebooks ?
 ------------
-To use the same data as in this project, a kaggle dataset has been created. You just have to download the data from [here]() and paste the data in ```data/raw```.
+To use the same data as in this project, a kaggle dataset has been created. You just have to download the data from [here]() and paste the data in ```data/raw```. All that remains is to run the notebooks in order and the additional data will be created automatically. There is also a requirements.txt file, just open a terminal and go to the project folder and do ```pip install requirements.txt```. This will download the packages needed to run the project. It is highly recommended to create a virtual environment beforehand.
 
 Project Organization
 ------------
