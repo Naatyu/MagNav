@@ -78,7 +78,7 @@ import os
 d2r = np.pi/180
 
 basepath = os.path.dirname(__file__)
-shc_fn = '../data/external/IGRF13.shc' # Default shc file
+shc_fn = 'data/external/IGRF13.shc' # Default shc file
 
 # Geomagnetic reference radius:
 RE = 6371.2 # km

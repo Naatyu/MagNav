@@ -87,6 +87,8 @@ target/
 /data/interim/Sol_dataset_csv
 /data/interim/Flt_data.h5
 /data/interim/Sol_dataset.h5
+/data/interim/dataset_csv
+/data/interim/dataset.h5
 
 # Mac OS-specific storage files
 .DS_Store

@@ -7,6 +7,8 @@ sys.path.insert(0,'./notebooks')
 import magnav
 # Be sure to be at MagNav root directory
 
+print('Python script to transform raw data to corrected features as in the solution to the MIT challenge.')
+
 for n in tqdm(range(2,6)):
     
     df = pd.read_hdf(r'./data/interim/Flt_data.h5', key=f'Flt100{n}')
@@ -50,3 +52,4 @@ for n in tqdm(range(2,6)):
     df_sol.to_hdf(f'./data/interim/Sol_dataset.h5',key=f'Flt100{n}')
     # export to csv
     df_sol.to_csv(f'./data/interim/Sol_dataset_csv/Flt100{n}.csv')
+print('Done')
