@@ -33,8 +33,9 @@ def apply_corrections(df,diurnal=True,igrf=True):
 
 
 print('Python script to transform raw data to corrected features for model training.(If you have any doubt, please refer to the notebook n°1)\nChoice of corrections : ')
-diurnal_choice = input("Apply Diurnal correction ? (1 for True, 0 for False)\n")
-igrf_choice = input("Apply IGRF correction ? (1 for True, 0 for False)\n")
+diurnal_choice = int(input("Apply Diurnal correction ? (1 for True, 0 for False)\n"))
+igrf_choice = int(input("Apply IGRF correction ? (1 for True, 0 for False)\n"))
+
     
 for n in tqdm(range(2,6)):
     
@@ -74,7 +75,7 @@ for n in tqdm(range(2,6)):
     
     # Get selected features
     features = ['TL_comp_mag3_cl','TL_comp_mag5_cl','V_BAT1','V_BAT2','TOPO',
-                'INS_VEL_N','INS_VEL_W','INS_VEL_V','BARO','CUR_IHTR','PITCH','ROLL','AZIMUTH']
+                'INS_VEL_N','INS_VEL_W','INS_VEL_V','BARO','CUR_IHTR','PITCH','ROLL','AZIMUTH','LINE','IGRFMAG1']
     
     # export to HDF5
     COR_df[features].to_hdf(f'data/interim/dataset.h5',key=f'Flt100{n}')
