@@ -89,6 +89,8 @@ target/
 /data/interim/Sol_dataset.h5
 /data/interim/dataset_csv
 /data/interim/dataset.h5
+/data/interim/Chall_dataset.h5
+/data/interim/Chall_dataset_csv
 
 # Mac OS-specific storage files
 .DS_Store

@@ -1,6 +1,7 @@
 Magnetic Navigation (currently in progress)
 ==============================
-Magnetic navigation project by Nathan Laoué supervised by Arnaud Lepers (DGA-MI/SYSNAV), Charly Faure (DGA-MI/IA2P) and Laure Deletraz (DGA-MI/IA2P).
+Magnetic navigation project by Nathan Laoué
+
 
 Introduction
 ------------
