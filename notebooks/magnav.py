@@ -87,23 +87,6 @@ def rmse(y_pred, y_true, subtract_mean=True):
         err = np.sqrt(mean_squared_error(y_true, y_pred))
     
     return err
-
-"""
-check_GPU()
-
-Return training device for PyTorch.
-
-**Arguments:**
-- None
-
-**Returns:**
-- device : Return training device for PyTorch
-"""
-def get_device():
-    dev = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Currently using {dev}")
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    return device
     
 
 #---------------------------------#

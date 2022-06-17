@@ -1,0 +1,20 @@
+Line Number,time,event
+1006.04,49165.26,Box 1 start
+1006.04,49188.92,Clean configuration
+1006.04,49798.47,Box 1 end
+1006.04,49940.07,Box 2 start
+1006.04,50318.52,Box 2 end
+1006.04,50340.66,Box 3 start – change config on south heading
+1006.04,50411.37,Start config – change on west heading
+1006.04,50804.16,End of config
+1006.04,50829.66,Start of config change
+1006.04,51301.69,End of config
+1006.04,51377.53,Start of box – 1 change per oscillation
+1006.04,52013.82,Start of box
+1006.04,52371.96,End of box
+1006.04,52408.42,Start of box
+1006.04,52843.06,End of box
+1006.04,52861.78,Start of box
+1006.08,55774.45,400m comp with config changes
+1006.08,55894.04,Power line
+1006.08,56053.36,Tower
