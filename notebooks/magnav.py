@@ -4,7 +4,6 @@ import time
 import random
 from sklearn.metrics import mean_squared_error
 from scipy import signal
-import torch
 import copy
 
 
@@ -272,11 +271,12 @@ measurements and a bandpass, low-pass or high-pass filter.
 - `lowcut, highcut` : (optional) critical frequencies of the filter [Hz]
 - `fs`: (optional) sampling frequency [Hz]
 - `filter_params` : (optional) ['Butterworth',4] ['firwin',255,'hamming'] 'None'
+- `ridge` : (optional) Ridge parameter for ridge regression. Disabled by default.
 
 **Returns:**
 - `TL_coef`: Tolles-Lawson coefficients
 """
-def create_TL_coef(Bx, By, Bz, meas, add_induced=True, add_eddy=True, lowcut=0.1, highcut=0.9, fs=10.0, filter_params=['Butterworth',4]):
+def create_TL_coef(Bx, By, Bz, meas, add_induced=True, add_eddy=True, lowcut=0.1, highcut=0.9, fs=10.0, filter_params=['Butterworth',4], ridge=None):
     
     # apply filter to scalar measurements
     if filter_params[0] == 'Butterworth':
@@ -310,6 +310,9 @@ def create_TL_coef(Bx, By, Bz, meas, add_induced=True, add_eddy=True, lowcut=0.1
     meas_f_t = meas_f[trim:np.shape(meas_f)[0]-trim,:]
     
     # get Tolles-Lawson coefficients
-    TL_coef = np.linalg.lstsq(A_f_t, meas_f_t, rcond=None)[0]
+    if ridge == None:
+        TL_coef = np.linalg.lstsq(A_f_t, meas_f_t, rcond=None)[0]
+    else:
+        TL_coef = np.linalg.inv(A_f_t.T.dot(A_f_t)+ridge*np.eye(np.shape(A_f_t)[1])).dot(A_f_t.T).dot(meas_f_t)
     
     return TL_coef

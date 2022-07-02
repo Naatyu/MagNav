@@ -14,6 +14,8 @@ import argparse
 import warnings
 import os
 from datetime import datetime
+import time
+import math
 
 
 #--- Functions ---#
@@ -39,48 +41,44 @@ class MagNavDataset(Dataset):
         
         if split == 'train':
             
-            sections = np.delete(np.concatenate([df2_scaled.LINE.unique(),df3_scaled.LINE.unique()]),20)
+            # Keeping only 1003, 1002, 1006 and 1004 flight sections for training except 1002.14
+            sections = np.concatenate([df2.LINE.unique(),df3.LINE.unique(),df4.LINE.unique(),df6.LINE.unique()]).tolist()
+            self.sections = sections
+            
             mask_train = pd.Series(dtype=bool)
             for line in sections:
                 mask  = (df.LINE == line)
                 mask_train = mask|mask_train
             
+            # Split in X, y for training
             X_train    = df.loc[mask_train,self.features]
             y_train    = df.loc[mask_train,'IGRFMAG1']
             
-            self.X = trim_data(torch.tensor(X_train.to_numpy(),dtype=torch.float32),seq_length)
+            # Removing data that can't fit in full sequence and convert it to torch tensor
+            self.X = torch.t(trim_data(torch.tensor(X_train.to_numpy(),dtype=torch.float32),seq_length))
             self.y = trim_data(torch.tensor(np.reshape(y_train.to_numpy(),[-1,1]),dtype=torch.float32),seq_length)
             
         elif split == 'val':
             
-            mask_val   = (df.LINE == 1002.14)
+            # Selecting 1007.02 for validation
+            mask_val   = (df.LINE == 1007.02)
+            self.sections = 1007.02
             
+            # Split in X, y for validation
             X_val      = df.loc[mask_val,self.features]
             y_val      = df.loc[mask_val,'IGRFMAG1']
             
-            self.X = trim_data(torch.tensor(X_val.to_numpy(),dtype=torch.float32),seq_length)
+            # Removing data that can't fit in full sequence and convert it to torch tensor
+            self.X = torch.t(trim_data(torch.tensor(X_val.to_numpy(),dtype=torch.float32),seq_length))
             self.y = trim_data(torch.tensor(np.reshape(y_val.to_numpy(),[-1,1]),dtype=torch.float32),seq_length)
-            
-        elif split == 'test':
-            
-            mask_test = pd.Series(dtype=bool)
-            for line in df4_scaled.LINE.unique():
-                mask  = (df.LINE == line)
-                mask_test = mask|mask_test
-            
-            X_test     = df.loc[mask_test,self.features]
-            y_test     = df.loc[mask_test,'IGRFMAG1']
-            
-            self.X = trim_data(torch.tensor(X_test.to_numpy(),dtype=torch.float32),seq_length)
-            self.y = trim_data(torch.tensor(np.reshape(y_test.to_numpy(),[-1,1]),dtype=torch.float32),seq_length)
-        
+
     def __getitem__(self, index):
-        X = self.X[index:(index+self.seq_length),:]
+        X = self.X[:,index:(index+self.seq_length)]
         y = self.y[index+self.seq_length-1]
         return X, y
     
     def __len__(self):
-        return len(self.X)-self.seq_length
+        return len(torch.t(self.X))-self.seq_length
 
 
 class RMSELoss(torch.nn.Module):
@@ -101,31 +99,33 @@ class CNN(torch.nn.Module):
 
         self.architecture = torch.nn.Sequential(
 
-            torch.nn.Conv1d(in_channels  = seq_length,
-                            out_channels = 64,
-                            kernel_size  = 5,
+            torch.nn.Conv1d(in_channels  = 11,
+                            out_channels = 128,
+                            kernel_size  = 2,
                             stride       = 1,
-                            padding      = 2,
+                            padding      = 0,
                             padding_mode = 'zeros'),
             torch.nn.ReLU(),
             torch.nn.MaxPool1d(kernel_size = 2,
                                stride      = 2),
-            torch.nn.Conv1d(in_channels  = 64,
+            torch.nn.Conv1d(in_channels  = 128,
                             out_channels = 128,
-                            kernel_size  = 3,
+                            kernel_size  = 2,
                             stride       = 1,
-                            padding      = 2,
+                            padding      = 0,
                             padding_mode = 'zeros'),
+            torch.nn.Dropout2d(p=0.2),
             torch.nn.ReLU(),
             torch.nn.MaxPool1d(kernel_size = 2,
                               stride       = 2),
 
             torch.nn.Flatten(),
-            torch.nn.Linear(384,128),
+            torch.nn.Linear(49*128,512),
+            torch.nn.Dropout(0.3),
             torch.nn.ReLU(),
-            torch.nn.Linear(128,64),
+            torch.nn.Linear(512,256),
             torch.nn.ReLU(),
-            torch.nn.Linear(64,1))
+            torch.nn.Linear(256,1))
 
     def forward(self, x):
         logits = self.architecture(x)
@@ -215,12 +215,14 @@ def make_training(model,EPOCHS):
 
 if __name__ == "__main__":
     
-    warnings.filterwarnings("ignore", category=UserWarning) # Remove UserWarnings from Python
+    # Start timer
+    start_time = time.time()
+    
+    # Remove UserWarnings from Python
+    warnings.filterwarnings("ignore", category=UserWarning) 
     
     # Reproducibility
     torch.manual_seed(27)
-    torch.backends.cudnn.benchmark = False
-    torch.use_deterministic_algorithms(True)
     random.seed(27)
     np.random.seed(27)
     
@@ -250,42 +252,54 @@ if __name__ == "__main__":
     SEQ_LEN    = args.seq
     
     # Import Data
+    
     df2 = pd.read_hdf('./data/interim/Chall_dataset.h5', key=f'Flt1002')
     df3 = pd.read_hdf('./data/interim/Chall_dataset.h5', key=f'Flt1003')
     df4 = pd.read_hdf('./data/interim/Chall_dataset.h5', key=f'Flt1004')
-    print('Import Done')
+    df6 = pd.read_hdf('./data/interim/Chall_dataset.h5', key=f'Flt1006')
+    df7 = pd.read_hdf('./data/interim/Chall_dataset.h5', key=f'Flt1007')
     
-    # Data scaling
+    scaling = 'None'
 #     scaling_range = [-1,1]
-#     MinMaxScaler_2 = MinMaxScaler(scaling_range)
-#     MinMaxScaler_3 = MinMaxScaler(scaling_range)
-#     MinMaxScaler_4 = MinMaxScaler(scaling_range)
 
 #     df2_scaled = pd.DataFrame()
 #     df3_scaled = pd.DataFrame()
 #     df4_scaled = pd.DataFrame()
 
+#     min_df2 = df2['TL_comp_mag5_cl'].min()
+#     max_df2 = df2['TL_comp_mag5_cl'].max()
 
-#     df2_scaled[df2.drop(columns=['LINE','IGRFMAG1']).columns] = MinMaxScaler_2.fit_transform(df2.drop(columns=['LINE','IGRFMAG1']))
-#     df3_scaled[df3.drop(columns=['LINE','IGRFMAG1']).columns] = MinMaxScaler_3.fit_transform(df3.drop(columns=['LINE','IGRFMAG1']))
-#     df4_scaled[df4.drop(columns=['LINE','IGRFMAG1']).columns] = MinMaxScaler_4.fit_transform(df4.drop(columns=['LINE','IGRFMAG1']))
+#     min_df3 = df3['TL_comp_mag5_cl'].min()
+#     max_df3 = df3['TL_comp_mag5_cl'].max()
 
-#     df2_scaled.index = df2.index
-#     df3_scaled.index = df3.index
-#     df4_scaled.index = df4.index
+#     min_df4 = df4['TL_comp_mag5_cl'].min()
+#     max_df4 = df4['TL_comp_mag5_cl'].max()
+    
+#     min_df6 = df6['TL_comp_mag5_cl'].min()
+#     max_df6 = df6['TL_comp_mag5_cl'].max()
+    
+#     min_df7 = df7['TL_comp_mag5_cl'].min()
+#     max_df7 = df7['TL_comp_mag5_cl'].max()
+
+#     df2_scaled = -1+((df2 - min_df2)*(2))/(max_df2-min_df2)
+#     df3_scaled = -1+((df3 - min_df3)*(2))/(max_df3-min_df3)
+#     df4_scaled = -1+((df4 - min_df4)*(2))/(max_df4-min_df4)
+#     df6_scaled = -1+((df6 - min_df6)*(2))/(max_df6-min_df6)
+#     df7_scaled = -1+((df7 - min_df7)*(2))/(max_df7-min_df7)
 
 #     df2_scaled[['LINE','IGRFMAG1']] = df2[['LINE','IGRFMAG1']]
 #     df3_scaled[['LINE','IGRFMAG1']] = df3[['LINE','IGRFMAG1']]
 #     df4_scaled[['LINE','IGRFMAG1']] = df4[['LINE','IGRFMAG1']]
-    
-#     print('Data scaling Done')
+#     df6_scaled[['LINE','IGRFMAG1']] = df6[['LINE','IGRFMAG1']]
+#     df7_scaled[['LINE','IGRFMAG1']] = df7[['LINE','IGRFMAG1']]
+
+                #     print('Data scaling Done\n')
     
     # Train, Validation, Test set
-    df_concat = pd.concat([df2,df3,df4],ignore_index=True,axis=0)
+    df_concat = pd.concat([df2,df3,df4,df6,df7],ignore_index=True,axis=0)
 
     train = MagNavDataset(df_concat,seq_length=SEQ_LEN,split='train')
     val   = MagNavDataset(df_concat,seq_length=SEQ_LEN,split='val')
-    test  = MagNavDataset(df_concat,seq_length=SEQ_LEN,split='test')
     
     # Dataloaders
     train_loader  = DataLoader(train,
@@ -299,18 +313,12 @@ if __name__ == "__main__":
                                shuffle=False,
                                num_workers=0,
                                pin_memory=False)
-
-    test_loader    = DataLoader(test,
-                               batch_size=BATCH_SIZE,
-                               shuffle=False,
-                               num_workers=0,
-                               pin_memory=False)
     
     print('Data split Done')
     
     # Model
     model = CNN(SEQ_LEN).to(DEVICE)
-    model.name = f'CNN_e{EPOCHS}_b{BATCH_SIZE}_s{SEQ_LEN}'
+    model.name = 'CNN'
     
     # Loss
     criterion = RMSELoss()
@@ -320,7 +328,7 @@ if __name__ == "__main__":
     
     # Saving the model and metrics
     date = datetime.strftime(datetime.now(),'%y%m%d_%H%M')
-    folder_path = f'models/CNN_runs/CNN_e{EPOCHS}_b{BATCH_SIZE}_s{SEQ_LEN}_{date}'
+    folder_path = f'models/CNN_runs/{model.name}_{date}'
     os.mkdir(folder_path)
     
     torch.save(model,folder_path+f'/{model.name}.pt')
@@ -332,7 +340,24 @@ if __name__ == "__main__":
     with open(folder_path+'/val_loss.txt','w') as f:
         for item in val_loss_history:
             f.write('%s\n' % item)
+            
+    # Saving parameters in txt 
+    end_time = time.time()-start_time
 
+    with open(folder_path+'/parameters.txt','w') as f:
+        f.write(f'Epochs :\n{EPOCHS}\n\n')
+        f.write(f'Batch_size :\n{BATCH_SIZE}\n\n')
+        f.write(f'Loss :\n{criterion}\n\n')
+        f.write(f'Scaling :\n{scaling}\n\n')
+        f.write(f'Input_shape :\n{[train.__getitem__(0)[0].size()[0],train.__getitem__(0)[0].size()[1]]}\n\n')
+        f.write(f'Sequence_length :\n{SEQ_LEN}\n\n')
+        f.write(f'Training_device :\n{DEVICE}\n\n')
+        f.write(f'Execution_time :\n{end_time:.2f}s\n\n')
+        f.write(f'Architecture :\n{model}\n\n')
+        f.write(f'Features :\n{train.features}\n\n')
+        f.write(f'Train sections :\n{train.sections}\n\n')
+        f.write(f'Validation sections :\n{val.sections}\n')
+        
     # Empty GPU ram and shutdown computer
     torch.cuda.empty_cache()
     
