@@ -76,7 +76,17 @@ target/
 .ipynb_checkpoints/
 
 # exclude data from source control by default
-/data/
+/data/raw/Eastern_2.h5
+/data/raw/Renfrew_2.h5
+/data/raw/Flt1002-train.h5
+/data/raw/Flt1003-train.h5
+/data/raw/Flt1004-train.h5
+/data/raw/Flt1005-train.h5
+/data/raw/readmes
+/data/interim/FLT_data_csv
+/data/interim/Sol_dataset_csv
+/data/interim/Flt_data.h5
+/data/interim/Sol_dataset.h5
 
 # Mac OS-specific storage files
 .DS_Store

@@ -1,0 +1,50 @@
+Epochs :
+20
+
+Batch_size :
+32
+
+Loss :
+RMSELoss()
+
+Scaling :
+none
+
+Input_shape :
+[11, 500]
+
+Sequence_length :
+500
+
+Training_device :
+cuda
+
+Execution_time :
+586.70s
+
+Architecture :
+CNN(
+  (architecture): Sequential(
+    (conv_1): Conv1d(11, 8, kernel_size=(3,), stride=(1,), padding=(1,))
+    (relu_1): ReLU()
+    (maxpool_1): MaxPool1d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+    (conv_2): Conv1d(8, 16, kernel_size=(3,), stride=(1,), padding=(1,))
+    (relu_2): ReLU()
+    (maxpool_2): MaxPool1d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+    (flatten): Flatten(start_dim=1, end_dim=-1)
+    (linear_1): Linear(in_features=2000, out_features=256, bias=True)
+    (relu_3): ReLU()
+    (linear_2): Linear(in_features=256, out_features=128, bias=True)
+    (relu_4): ReLU()
+    (linear_3): Linear(in_features=128, out_features=1, bias=True)
+  )
+)
+
+Features :
+['TL_comp_mag3_cl', 'TL_comp_mag5_cl', 'V_BAT1', 'V_BAT2', 'INS_ACC_X', 'INS_ACC_Y', 'INS_ACC_Z', 'CUR_IHTR', 'PITCH', 'ROLL', 'AZIMUTH']
+
+Train sections :
+[1002.01, 1002.02, 1002.03, 158.0, 1002.04, 160.0, 1002.05, 1367.0, 1002.06, 1368.0, 1002.07, 1369.0, 1002.08, 3084.0, 1002.09, 3085.0, 1002.1, 3086.0, 1002.11, 1002.13, 1002.15, 1002.16, 1002.17, 1002.18, 1002.19, 1002.2, 1002.21, 1003.01, 1003.02, 1003.03, 1003.04, 1003.05, 1003.06, 1003.07, 1003.08, 1003.09, 1003.11, 1004.01, 4019.0, 4018.0, 4017.0, 4016.0, 421.0, 419.0, 417.0, 415.0, 413.0, 411.0, 409.0, 408.0, 407.0, 405.0, 403.0, 401.0, 4015.0, 4012.0, 4001.0, 1004.02]
+
+Validation sections :
+1002.14
