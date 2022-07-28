@@ -16,14 +16,16 @@ import joblib
 
 class LSTM(torch.nn.Module):
     
-    def __init__(self, seq_len, drop_lstm1, hidden_size, num_layers, num_LSTM, num_Linear, num_neurons):
+    def __init__(self, seq_len, drop_lstm1, hidden_size, num_layers, num_LSTM, num_linear, num_neurons):
         
         super(LSTM, self).__init__()
         self.num_LSTM = num_LSTM
+        self.num_linear = num_linear
+        self.hidden_size = hidden_size
         self.drop_lstm1 = drop_lstm1
         self.num_layers = num_layers
         self.lstms = nn.ModuleList()
-        self.linears = nn.ModuleLsit()
+        self.linears = nn.ModuleList()
         
         for k in range(num_LSTM):
             if k == 0:
@@ -32,18 +34,23 @@ class LSTM(torch.nn.Module):
                 
             self.lstms.append(nn.LSTM(hidden_size[k-1], hidden_size[k], num_layers[k], batch_first=True))
             
-        for n in range(num_Linear):
-            if n == 1:
+        for n in range(num_linear):
+            if n == 0:
                 self.linears.append(nn.Linear(hidden_size[-1], num_neurons[0]))
+                continue
             
             self.linears.append(nn.Linear(num_neurons[n-1], num_neurons[n]))
+        
+        self.linears.append(nn.Linear(num_neurons[-1],1))
             
         for k in range(num_LSTM):
-            nn.init.kaiming_normal_(self.lstms[k].weight)
+            nn.init.kaiming_normal_(self.lstms[k]._parameters['weight_ih_l0'])
+            nn.init.kaiming_normal_(self.lstms[k]._parameters['weight_hh_l0'])
             if self.lstms[k].bias is not None:
-                nn.init.constant_(self.lstms[k].bias, 0)
+                nn.init.constant_(self.lstms[k]._parameters['bias_ih_l0'], 0)
+                nn.init.constant_(self.lstms[k]._parameters['bias_hh_l0'], 0)
         
-        for k in range(num_Linear):
+        for k in range(num_linear):
             nn.init.kaiming_normal_(self.linears[k].weight)
             if self.linears[k].bias is not None:
                 nn.init.constant_(self.linears[k].bias, 0)
@@ -51,23 +58,24 @@ class LSTM(torch.nn.Module):
             
     def forward(self, x):
         
-        for k, lstm_k in range(num_LSTM):
+        for k, lstm_k in enumerate(self.lstms):
             if k == 0:
-                h = torch.zeros(num_layers[k], x.size(0), hidden_size[k]).to('cuda')
-                c = torch.zeros(num_layers[k], x.size(0), hidden_size[k]).to('cuda')
+                h = torch.zeros(self.num_layers[k], x.size(0), self.hidden_size[k]).to('cuda')
+                c = torch.zeros(self.num_layers[k], x.size(0), self.hidden_size[k]).to('cuda')
 
-                out, _ = F.dropout(lstm_k(x, (h,c), self.drop_lstm1)
+                out, _ = lstm_k(x, (h,c))
+                out = F.dropout(out)
                 continue
                                    
-            h = torch.zeros(num_layers[k], x.size(0), hidden_size[k]).to('cuda')
-            c = torch.zeros(num_layers[k], x.size(0), hidden_size[k]).to('cuda')
+            h = torch.zeros(self.num_layers[k], x.size(0), self.hidden_size[k]).to('cuda')
+            c = torch.zeros(self.num_layers[k], x.size(0), self.hidden_size[k]).to('cuda')
 
             out, _ = lstm_k(out, (h,c))
         
         out = out[:, -1, :]
         
-        for k, linear_k in range(num_Linear):
-            if k = num_Linear[-1]:
+        for k, linear_k in enumerate(self.linears):
+            if k == self.num_linear-1:
                 out = linear_k(out)
                 return out
             
@@ -141,20 +149,22 @@ def validate(network,seq_len):
     
     return validation_RMSE
 
-
+# (self, seq_len, drop_lstm1, hidden_size, num_layers, num_LSTM, num_linear, num_neurons):
 def objective(trial):
     
-    num_conv_layers = trial.suggest_int("num_conv_layers",2,3)                        # Number of convolutional layers
-    num_filters     = [int(trial.suggest_discrete_uniform(
-                      f"num_filter_{i}",8,128,4)) for i in range(num_conv_layers)]    # Number of filters for the conv layers
-    num_neurons     = [int(trial.suggest_discrete_uniform(
-                      f"num_neurons_{i}",4,1024,4)) for i in range(2)]                # Number of neurons for the FC layers
-    drop_conv1      = trial.suggest_float("drop_conv1",0,0.5)                         # Drop for 2nd conv layer
-    drop_fc1        = trial.suggest_float("drop_fc1",0,0.5)                           # Drop for 1st FC layer
-    seq_len         = int(trial.suggest_discrete_uniform("seq_len",15,300,5))         # Length of a sequence
+    num_LSTM    = trial.suggest_int('num_lstm_layers',1,10)                           # Number of LSTM layers
+    hidden_size = [int(trial.suggest_discrete_uniform(
+                      f"hidden_size_{i}",4,512,4)) for i in range(num_LSTM)]          # Hidden size by lstm layers
+    num_layers  = [int(trial.suggest_discrete_uniform(
+                      f"layers_lstm_{i}",1,20,1)) for i in range(num_LSTM)]           # Layers by lstm layers
+    num_linear  = trial.suggest_int("num_linear_layers",1,3)                          # Number of fully connected layers
+    num_neurons = [int(trial.suggest_discrete_uniform(
+                      f"num_neurons_{i}",4,1024,4)) for i in range(num_linear)]       # Number of neurons for the FC layers
+    drop_lstm1  = trial.suggest_float("drop_lstm1",0,0.5)                             # Drop for 1st LSTM layer
+    seq_len     = int(trial.suggest_discrete_uniform("seq_len",5,400,5))              # Length of a sequence
     
-    model = CNN(trial, num_conv_layers, num_filters,
-                num_neurons, drop_conv1, drop_fc1, seq_len).to(device)                # Generate the model
+    model = LSTM(seq_len, drop_lstm1, hidden_size, num_layers, 
+                 num_LSTM, num_linear, num_neurons).to(device)                        # Generate the model
     
     optimizer_name = trial.suggest_categorical("optimizer",["Adam","RMSprop","SGD"])  # Optimizers
     lr             = trial.suggest_float("lr", 1e-6, 1e-1, log=True)                  # Learning rates
@@ -192,7 +202,7 @@ class MagNavDataset(Dataset):
         
         if split == 'train':
             
-            # Keeping only 1003, 1002, 1006 and 1004 flight sections for training except 1002.14
+            # Keeping only 1003, 1002, 1004 and 1006 flight sections for training
             sections = np.concatenate([df2.LINE.unique(),df3.LINE.unique(),df4.LINE.unique(),df6.LINE.unique()]).tolist()
             self.sections = sections
             
@@ -211,7 +221,7 @@ class MagNavDataset(Dataset):
             
         elif split == 'val':
             
-            # Selecting 1007.02 for validation
+            # Selecting 1007 for validation except 1007.06
             val_sections = df7.LINE.unique().tolist()
             val_sections.remove(1007.06)
             self.sections = val_sections
@@ -242,7 +252,7 @@ if __name__ == "__main__":
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")             # Use GPU if available for faster computation
     
-    n_epochs = 25                                                                     # Number of training epochs
+    n_epochs = 30                                                                     # Number of training epochs
     batch_size_train = 64                                                             # batch size for training
     batch_size_val = 64                                                              # batch size for validation
     number_of_trials = 200                                                            # Number of Optuna trials

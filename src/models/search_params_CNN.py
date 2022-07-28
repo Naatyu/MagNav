@@ -91,8 +91,8 @@ class RMSELoss(torch.nn.Module):
         criterion = torch.nn.MSELoss()
         loss = torch.sqrt(criterion(yhat,y)+1e-6)
         return loss 
-    
- 
+
+
 
 class CNN(torch.nn.Module):
 

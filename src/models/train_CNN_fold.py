@@ -9,6 +9,7 @@ from torch.utils.data import Dataset, DataLoader
 from tabulate import tabulate
 from tqdm import tqdm
 import random
+from sklearn.model_selection import KFold
 
 import argparse
 import warnings
@@ -19,6 +20,15 @@ import math
 
 
 #--- Functions ---#
+def reset_weights(m):
+    '''
+    Reset weights to avoid weight leakage
+    '''
+    for layer in m.children():
+        if hasattr(layer, 'reset_parameters'):
+            print(f'Reset trainable parameters of layer = {layer}')
+            layer.reset_parameters()
+    
 
 def trim_data(data,seq_length):
     # Remove excessive data that cannot be in a full sequence
@@ -32,21 +42,38 @@ def trim_data(data,seq_length):
 
 class MagNavDataset(Dataset):
     # split can be 'Train', 'Val', 'Test'
-    def __init__(self, df, seq_length, split):
+    def __init__(self, df, seq_length, n_fold, split):
         
         self.seq_length = seq_length
         
         # Get list of features
-        self.features   = df.drop(columns=['LINE','IGRFMAG1']).columns.to_list()
+        self.features = df.drop(columns=['LINE','IGRFMAG1']).columns.to_list()
+        
+        # Get train sections for fold n
+        train_fold_0 = np.concatenate([df2.LINE.unique(),df3.LINE.unique(),df4.LINE.unique(),df6.LINE.unique()]).tolist()
+        test_fold_0  = df7.LINE.unique().tolist()
+        
+        train_fold_1 = np.concatenate([df3.LINE.unique(),df4.LINE.unique(),df6.LINE.unique(),df7.LINE.unique()]).tolist()
+        test_fold_1  = df2.LINE.unique().tolist()
+        
+        train_fold_2 = np.concatenate([df4.LINE.unique(),df6.LINE.unique(),df7.LINE.unique(),df2.LINE.unique()]).tolist()
+        test_fold_2  = df3.LINE.unique().tolist()
+        
+        if n_fold == 0:
+            self.train_sections = train_fold_0
+            self.test_sections = test_fold_0
+        elif n_fold == 1:
+            self.train_sections = train_fold_1
+            self.test_sections = test_fold_1
+        elif n_fold == 2:
+            self.train_sections = train_fold_2
+            self.test_sections = test_fold_2
+        
         
         if split == 'train':
             
-            # Keeping only 1003, 1002, 1006 and 1004 flight sections for training except 1002.14
-            sections = np.concatenate([df2.LINE.unique(),df3.LINE.unique(),df4.LINE.unique(),df6.LINE.unique()]).tolist()
-            self.sections = sections
-            
             mask_train = pd.Series(dtype=bool)
-            for line in sections:
+            for line in self.train_sections:
                 mask  = (df.LINE == line)
                 mask_train = mask|mask_train
             
@@ -58,25 +85,20 @@ class MagNavDataset(Dataset):
             self.X = torch.t(trim_data(torch.tensor(X_train.to_numpy(),dtype=torch.float32),seq_length))
             self.y = trim_data(torch.tensor(np.reshape(y_train.to_numpy(),[-1,1]),dtype=torch.float32),seq_length)
             
-        elif split == 'val':
+        elif split == 'test':
             
-            # Selecting 1007 for validation
-            val_sections = df7.LINE.unique().tolist()
-            val_sections.remove(1007.06)
-            self.sections = val_sections
-            
-            mask_val = pd.Series(dtype=bool)
-            for line in val_sections:
+            mask_test = pd.Series(dtype=bool)
+            for line in self.test_sections:
                 mask  = (df.LINE == line)
-                mask_val = mask|mask_val
+                mask_test = mask|mask_test
             
-            # Split in X, y for validation
-            X_val      = df.loc[mask_val,self.features]
-            y_val      = df.loc[mask_val,'IGRFMAG1']
+            # Split in X, y for test
+            X_test      = df.loc[mask_test,self.features]
+            y_test      = df.loc[mask_test,'IGRFMAG1']
             
             # Removing data that can't fit in full sequence and convert it to torch tensor
-            self.X = torch.t(trim_data(torch.tensor(X_val.to_numpy(),dtype=torch.float32),seq_length))
-            self.y = trim_data(torch.tensor(np.reshape(y_val.to_numpy(),[-1,1]),dtype=torch.float32),seq_length)
+            self.X = torch.t(trim_data(torch.tensor(X_test.to_numpy(),dtype=torch.float32),seq_length))
+            self.y = trim_data(torch.tensor(np.reshape(y_test.to_numpy(),[-1,1]),dtype=torch.float32),seq_length)
 
     def __getitem__(self, index):
         X = self.X[:,index:(index+self.seq_length)]
@@ -106,21 +128,20 @@ class RMSELoss(torch.nn.Module):
 #         self.layers = torch.nn.Sequential(
 
 #             torch.nn.Conv1d(in_channels  = 11,
-#                             out_channels = 48,
+#                             out_channels = 16,
 #                             kernel_size  = 2),
 #             torch.nn.ReLU(),
 #             torch.nn.MaxPool1d(kernel_size = 2,
 #                                stride      = 2),
-#             torch.nn.Conv1d(in_channels  = 48,
-#                             out_channels = 120,
+#             torch.nn.Conv1d(in_channels  = 16,
+#                             out_channels = 32,
 #                             kernel_size  = 2),
-#             torch.nn.Dropout2d(p=0.3),
 #             torch.nn.ReLU(),
 #             torch.nn.MaxPool1d(kernel_size = 2,
 #                               stride       = 2),
 
 #             torch.nn.Flatten(),
-#             torch.nn.Linear(2880,90),
+#             torch.nn.Linear(768,90),
 #             torch.nn.ReLU(),
 #             torch.nn.Linear(90,20),
 #             torch.nn.ReLU(),
@@ -130,9 +151,9 @@ class RMSELoss(torch.nn.Module):
 #         torch.nn.init.constant_(self.layers[0].bias, 0)
 #         torch.nn.init.kaiming_normal_(self.layers[3].weight, nonlinearity='relu')
 #         torch.nn.init.constant_(self.layers[3].bias, 0)
-#         torch.nn.init.kaiming_normal_(self.layers[8].weight, nonlinearity='relu')
+#         torch.nn.init.kaiming_normal_(self.layers[7].weight, nonlinearity='relu')
 # #         torch.nn.init.constant_(self.layers[8].bias, 0)
-#         torch.nn.init.kaiming_normal_(self.layers[10].weight, nonlinearity='relu')
+#         torch.nn.init.kaiming_normal_(self.layers[9].weight, nonlinearity='relu')
 # #         torch.nn.init.constant_(self.layers[10].bias, 0)
 # #         torch.nn.init.kaiming_normal_(self.layers[12].weight)
 # #         torch.nn.init.constant_(self.layers[12].bias, 0)
@@ -197,13 +218,13 @@ class CNN(nn.Module):
     
 def make_training(model,EPOCHS):
 
-    optimizer = torch.optim.Adam(model.parameters(),lr=5e-5) 
+    optimizer = torch.optim.Adam(model.parameters(),lr=1.5e-4) 
     
-    batch_bar = tqdm(total=len(train)//BATCH_SIZE,unit="batch",desc='Training',leave=False)
-    epoch_bar = tqdm(total=EPOCHS,unit="epoch",desc='Training')
+    batch_bar = tqdm(total=len(train)//BATCH_SIZE,unit="batch",desc='Training',leave=False, position=0, ncols=150)
+    epoch_bar = tqdm(total=EPOCHS,unit="epoch",desc='Training',leave=False, position=1, ncols=150)
 
     train_loss_history = []
-    val_loss_history = []
+    test_loss_history = []
 
     for epoch in range(EPOCHS):
 
@@ -244,15 +265,15 @@ def make_training(model,EPOCHS):
         train_loss = train_running_loss / batch_index
         train_loss_history.append(train_loss)
 
-        #---VALIDATION---#
+        #---Test---#
 
-        val_running_loss = 0.
+        test_running_loss = 0.
         
         model.eval()
         
         with torch.no_grad():
             
-            for batch_index, (inputs, labels) in enumerate(val_loader):
+            for batch_index, (inputs, labels) in enumerate(test_loader):
 
                 inputs, labels = inputs.to(DEVICE), labels.to(DEVICE)
 
@@ -263,15 +284,15 @@ def make_training(model,EPOCHS):
                 loss = criterion(predictions, labels)
 
                 # Gather data and report
-                val_running_loss += loss.item()
+                test_running_loss += loss.item()
 
-            val_loss = val_running_loss / batch_index
-            val_loss_history.append(val_loss)
+            test_loss = test_running_loss / batch_index
+            test_loss_history.append(test_loss)
         
-        epoch_bar.set_postfix(train_loss=train_loss,val_loss=val_loss,lr=optimizer.param_groups[0]['lr'])
+        epoch_bar.set_postfix(train_loss=train_loss,test_loss=test_loss,lr=optimizer.param_groups[0]['lr'])
         epoch_bar.update()
-
-    return train_loss_history, val_loss_history
+    print('\n')
+    return train_loss_history, test_loss_history
 
     
 #--- Main ---#
@@ -324,37 +345,60 @@ if __name__ == "__main__":
     
     scaling = 'none'
     
-                #     print('Data scaling Done\n')
-    
     # Train, Validation, Test set
     df_concat = pd.concat([df2,df3,df4,df6,df7],ignore_index=True,axis=0)
-
-    train = MagNavDataset(df_concat,seq_length=SEQ_LEN,split='train')
-    val   = MagNavDataset(df_concat,seq_length=SEQ_LEN,split='val')
     
-    # Dataloaders
-    train_loader  = DataLoader(train,
-                           batch_size=BATCH_SIZE,
-                           shuffle=True,
-                           num_workers=0,
-                           pin_memory=False)
+    # 
+    train_loss_history = []
+    test_loss_history = []
+    last_test = []
+    
+    for n_fold in range(3):
+        
+        print('\n--------------------')
+        print(f'Fold number {n_fold}')
+        print('--------------------\n')
+        
+        
+        train = MagNavDataset(df_concat, seq_length=SEQ_LEN, n_fold=n_fold, split='train')
+        test  = MagNavDataset(df_concat, seq_length=SEQ_LEN, n_fold=n_fold, split='test')
 
-    val_loader    = DataLoader(val,
+        # Dataloaders
+        train_loader  = DataLoader(train,
                                batch_size=BATCH_SIZE,
-                               shuffle=False,
+                               shuffle=True,
                                num_workers=0,
                                pin_memory=False)
-    
 
-    # Model
-    model = CNN(2,[48,120], [20,90], 0.3, 0.015,SEQ_LEN).to(DEVICE)
-    model.name = 'CNN'
-    
-    # Loss
-    criterion = torch.nn.MSELoss()
-    
-    # Training
-    train_loss_history, val_loss_history = make_training(model,EPOCHS)
+        test_loader    = DataLoader(test,
+                                   batch_size=BATCH_SIZE,
+                                   shuffle=False,
+                                   num_workers=0,
+                                   pin_memory=False)
+
+        # Model
+        model = CNN(2,[48,120], [20,90], 0.3, 0.015,SEQ_LEN).to(DEVICE)
+#         model = CNN(SEQ_LEN).to(DEVICE)
+        model.name = 'CNN'
+
+        # Loss
+        criterion = torch.nn.MSELoss()
+
+        # Training
+        train_loss, test_loss = make_training(model,EPOCHS)
+        train_loss_history.append(train_loss)
+        test_loss_history.append(test_loss)
+        last_test.append(test_loss[-1])
+        
+    perf_folds = sum(last_test)/3
+        
+    print('\n-------------------------')
+    print('Performance for all folds')
+    print('-------------------------')
+    print(f'Fold 1 | RMSE = {np.sqrt(last_test[0]):.2f} nT')
+    print(f'Fold 2 | RMSE = {np.sqrt(last_test[1]):.2f} nT')
+    print(f'Fold 3 | RMSE = {np.sqrt(last_test[2]):.2f} nT')
+    print(f'Total  | RMSE = {np.sqrt(perf_folds):.2f} nT\n')
     
     # Saving the model and metrics
     date = datetime.strftime(datetime.now(),'%y%m%d_%H%M')
@@ -367,8 +411,8 @@ if __name__ == "__main__":
         for item in train_loss_history:
             f.write('%s\n' % item)
         
-    with open(folder_path+'/val_loss.txt','w') as f:
-        for item in val_loss_history:
+    with open(folder_path+'/test_loss.txt','w') as f:
+        for item in test_loss_history:
             f.write('%s\n' % item)
             
     # Saving parameters in txt 
@@ -385,8 +429,6 @@ if __name__ == "__main__":
         f.write(f'Execution_time :\n{end_time:.2f}s\n\n')
         f.write(f'Architecture :\n{model}\n\n')
         f.write(f'Features :\n{train.features}\n\n')
-        f.write(f'Train sections :\n{train.sections}\n\n')
-        f.write(f'Validation sections :\n{val.sections}\n')
         
     # Empty GPU ram and shutdown computer
     torch.cuda.empty_cache()
