@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_squared_error
 from scipy import signal
-
 import time
 import random
 import copy
@@ -13,72 +12,66 @@ import copy
 #-------------------------#
 
 
-"""
-sampling_frequency(df)
-
-Calculates the sampling frequency of a pandas DataFrame indexed in time.
-
-**Arguments:**
-- `df` : Pandas DataFrame
-
-**Returns:**
-- `samp_freq` : sampling frequency of the dataset
-"""
 def sampling_frequency(df):
+    """
+    Calculates the sampling frequency of a pandas DataFrame indexed in time.
+
+    Arguments:
+    - `df` : Pandas DataFrame
+
+    Returns:
+    - `samp_freq` : sampling frequency of the dataset
+    """
     
     duration  = df.index[-1]-df.index[0]
     samp_freq = np.shape(df)[0]/duration
     
     return samp_freq
 
-"""
-to_hms(seconds)
-
-Transforms seconds to hours:minutes:seconds format.
-
-**Arguments:**
-- `seconds` : number in seconds that will be converted
-
-**Returns:**
-- `hms_format` : seconds converted to h:m:s format
-"""
 def to_hms(seconds):
+    """
+    Transforms seconds to hours:minutes:seconds format.
+
+    Arguments:
+    - `seconds` : number in seconds that will be converted
+
+    Returns:
+    - `hms_format` : seconds converted to h:m:s format
+    """
     
     hms_format = time.strftime("%Hh:%Mm:%Ss",time.gmtime(seconds))
     
     return hms_format
 
-"""
-get_random_color()
+def get_random_color():
+    """
+    Return a random color in HEX format.
 
-Return a random color in HEX format.
+    Arguments:
+    - None
 
-**Arguments:**
-- None
-
-**Returns:**
-- `rand_col` : random color in HEX format 
-"""
-def get_random_color():    
+    Returns:
+    - `rand_col` : random color in HEX format 
+    """
     
     rand_col = "#"+''.join([random.choice('0123456789ABCDEF') for j in range(6)])
     
     return rand_col
 
-"""
-rmse(y_true, y_pred, subtract_mean=True)
-
-Calculate root-mean-square error.
-
-**Arguments:**
-- `y_true` : ground truth target values
-- `y_pred` : estimated target values
-- `substract_mean` : (optional) center values to 0 mean
-
-**Returns:**
-- `err` : root-mean-squared error
-"""
 def rmse(y_pred, y_true, subtract_mean=True):
+    """
+    rmse(y_true, y_pred, subtract_mean=True)
+
+    Calculate root-mean-square error.
+
+    Arguments:
+    - `y_true` : ground truth target values
+    - `y_pred` : estimated target values
+    - `substract_mean` : (optional) center values to 0 mean
+
+    Returns:
+    - `err` : root-mean-squared error
+    """
     
     if subtract_mean:
         err = np.sqrt(mean_squared_error(y_true - y_true.mean(), 
@@ -87,27 +80,25 @@ def rmse(y_pred, y_true, subtract_mean=True):
         err = np.sqrt(mean_squared_error(y_true, y_pred))
     
     return err
-    
+
 
 #---------------------------------#
 #----Digital filters functions----#
 #---------------------------------#
 
 
-"""
-create_butter_filter(lowcut,highcut,fs,order=4)
-
-Design an Nth-order digital Butterworth filter.
-
-**Arguments:**
-- `lowcut, highcut` : critical frequencies of the filter [Hz]
-- `fs` : sampling frequency [Hz]
-- `order` : (optional) order of the Butterworth filter
-
-**Returns:**
-- `sos` : second-order representation of the IIR filter
-"""
 def create_butter_filter(lowcut, highcut, fs, order=4):
+    """
+    Design an Nth-order digital Butterworth filter.
+
+    Arguments:
+    - `lowcut, highcut` : critical frequencies of the filter [Hz]
+    - `fs` : sampling frequency [Hz]
+    - `order` : (optional) order of the Butterworth filter
+
+    Returns:
+    - `sos` : second-order representation of the IIR filter
+    """
     
     nyq = 0.5*fs
     low = lowcut/nyq
@@ -127,42 +118,38 @@ def create_butter_filter(lowcut, highcut, fs, order=4):
     
     return sos
 
-"""
-apply_butter_filter(data,lowcut,highcut,fs,order=4)
-
-Apply an Nth-order digital Butterworth filter.
-
-**Arguments:**
-- `data` : the data to which the filter should be applied
-- `lowcut, highcut` : critical frequencies of the filter [Hz]
-- `fs` : sampling frequency [Hz]
-- `order` : (optional) order of the Butterworth filter
-
-**Returns:**
-- `y` : filtered data
-"""
 def apply_butter_filter(data, lowcut, highcut, fs, order=4):
+    """
+    Apply an Nth-order digital Butterworth filter.
+
+    Arguments:
+    - `data` : the data to which the filter should be applied
+    - `lowcut, highcut` : critical frequencies of the filter [Hz]
+    - `fs` : sampling frequency [Hz]
+    - `order` : (optional) order of the Butterworth filter
+
+    Returns:
+    - `y` : filtered data
+    """
     
     sos = create_butter_filter(lowcut,highcut,fs,order=order)
     y   = signal.sosfiltfilt(sos,data)
     
     return y
 
-"""
-create_firwin_filter(lowcut,highcut,fs,ntaps=255,window='hamming')
-
-Design an FIR filter using the window method.
-
-**Arguments:**
-- `lowcut, highcut` : critical frequencies of the filter [Hz]
-- `fs` : sampling frequency [Hz]
-- `ntaps` : (optional) length of the filter (number of coefficinets), must be odd if it is a pass-band
-- `window` : (optional) Desired window to use (boxcar, triang, blackman, hamming, hann, ...) see scipy.signal.get_window
-
-**Returns:**
-- `taps` : coefficients of length numtaps FIR filter
-"""
 def create_firwin_filter(lowcut, highcut, fs, ntaps=255, window='hamming'):
+    """
+    Design an FIR filter using the window method.
+
+    Arguments:
+    - `lowcut, highcut` : critical frequencies of the filter [Hz]
+    - `fs` : sampling frequency [Hz]
+    - `ntaps` : (optional) length of the filter (number of coefficinets), must be odd if it is a pass-band
+    - `window` : (optional) Desired window to use (boxcar, triang, blackman, hamming, hann, ...) see scipy.signal.get_window
+
+    Returns:
+    - `taps` : coefficients of length numtaps FIR filter
+    """
     
     nyq = 0.5*fs
     
@@ -180,22 +167,20 @@ def create_firwin_filter(lowcut, highcut, fs, ntaps=255, window='hamming'):
     
     return taps
 
-"""
-apply_firwin_filter(data,lowcut,highcut,fs,ntaps=255,window='hamming')
-
-Apply an FIR filter using the window method.
-
-**Arguments:**
-- `data` : the data to which the filter should be applied
-- `lowcut, highcut` : critical frequencies of the filter [Hz]
-- `fs` : sampling frequency [Hz]
-- `ntaps` : (optional) length of the filter (number of coefficinets), must be odd if it is a pass-band
-- `window` : (optional) Desired window to use (boxcar, triang, blackman, hamming, hann, ...) see scipy.signal.get_window
-
-**Returns:**
-- `y` : filtered data
-"""
 def apply_firwin_filter(data, lowcut, highcut, fs, ntaps=255, window='hamming'):
+    """
+    Apply an FIR filter using the window method.
+
+    Arguments:
+    - `data` : the data to which the filter should be applied
+    - `lowcut, highcut` : critical frequencies of the filter [Hz]
+    - `fs` : sampling frequency [Hz]
+    - `ntaps` : (optional) length of the filter (number of coefficinets), must be odd if it is a pass-band
+    - `window` : (optional) Desired window to use (boxcar, triang, blackman, hamming, hann, ...) see scipy.signal.get_window
+
+    Returns:
+    - `y` : filtered data
+    """
     
     taps = create_firwin_filter(lowcut,highcut,fs,ntaps,window=window)
     y    = signal.filtfilt(taps,1,data)
@@ -208,19 +193,17 @@ def apply_firwin_filter(data, lowcut, highcut, fs, ntaps=255, window='hamming'):
 #-------------------------------#
 
 
-"""
-create_TL_A(Bx, By, Bz, add_induced, add_eddy)
-
-Create Tolles-Lawson A matrix using vector magnetometer measurements.
-
-**Arguments:**
-- `Bx, By, Bz` : vector magnetometer measurements
-- `add_induced, add_eddy` : (optional) Add induced and/or eddy terms to Tolles-Lawson A matrix.
-
-**Returns:**
-- `A` : Tolles-Lawson A matrix
-"""
 def create_TL_A(Bx, By, Bz, add_induced=True, add_eddy=True, Bt_scale=50000):
+    """
+    Create Tolles-Lawson A matrix using vector magnetometer measurements.
+
+    Arguments:
+    - `Bx, By, Bz` : vector magnetometer measurements
+    - `add_induced, add_eddy` : (optional) Add induced and/or eddy terms to Tolles-Lawson A matrix.
+
+    Returns:
+    - `A` : Tolles-Lawson A matrix
+    """
 
     Bt = np.sqrt(Bx**2 + By**2 + Bz**2)
     s  = Bt / Bt_scale # scale
@@ -232,9 +215,8 @@ def create_TL_A(Bx, By, Bz, add_induced=True, add_eddy=True, Bt_scale=50000):
     # (3) permanent moment
     A = np.column_stack((cosX, cosY, cosZ))
 
+    # (6) induced moment
     if add_induced:
-        
-        # (6) induced moment
         A_ind = np.column_stack((s*cosX*cosX,
                                  s*cosX*cosY,
                                  s*cosX*cosZ,
@@ -243,9 +225,8 @@ def create_TL_A(Bx, By, Bz, add_induced=True, add_eddy=True, Bt_scale=50000):
                                  s*cosZ*cosZ))
         A = np.column_stack((A, A_ind))
 
-    if add_eddy:
-        
-        # (9) eddy current        
+    # (9) eddy current
+    if add_eddy:        
         A_edd = np.column_stack((s*cosX*cosX_dot,
                                  s*cosX*cosY_dot,
                                  s*cosX*cosZ_dot,
@@ -259,25 +240,23 @@ def create_TL_A(Bx, By, Bz, add_induced=True, add_eddy=True, Bt_scale=50000):
 
     return A
 
-"""
-create_TL_coef(Bx, By, Bz, add_induced=True, add_eddy=True, meas, lowcut=0.1, highcut=0.9, fs=10.0)
-
-Create Tolles-Lawson coefficients using vector and scalar magnetometer 
-measurements and a bandpass, low-pass or high-pass filter.
-
-**Arguments:**
-- `Bx, By, Bz`: vector magnetometer measurements
-- `meas`: scalar magnetometer measurements
-- `add_induced, add_eddy` : (optional) Add induced and/or eddy terms to Tolles-Lawson A matrix.
-- `lowcut, highcut` : (optional) critical frequencies of the filter [Hz]
-- `fs`: (optional) sampling frequency [Hz]
-- `filter_params` : (optional) ['Butterworth',4] ['firwin',255,'hamming'] 'None'
-- `ridge` : (optional) Ridge parameter for ridge regression. Disabled by default.
-
-**Returns:**
-- `TL_coef`: Tolles-Lawson coefficients
-"""
 def create_TL_coef(Bx, By, Bz, meas, add_induced=True, add_eddy=True, lowcut=0.1, highcut=0.9, fs=10.0, filter_params=['Butterworth',4], ridge=None, Bt_scale=50000):
+    """
+    Create Tolles-Lawson coefficients using vector and scalar magnetometer 
+    measurements and a bandpass, low-pass or high-pass filter.
+
+    Arguments:
+    - `Bx, By, Bz`: vector magnetometer measurements
+    - `meas`: scalar magnetometer measurements
+    - `add_induced, add_eddy` : (optional) Add induced and/or eddy terms to Tolles-Lawson A matrix.
+    - `lowcut, highcut` : (optional) critical frequencies of the filter [Hz]
+    - `fs`: (optional) sampling frequency [Hz]
+    - `filter_params` : (optional) ['Butterworth',4] ['firwin',255,'hamming'] 'None'
+    - `ridge` : (optional) Ridge parameter for ridge regression. Disabled by default.
+
+    Returns:
+    - `TL_coef`: Tolles-Lawson coefficients
+    """
     
     # apply filter to scalar measurements
     if filter_params[0] == 'Butterworth':
@@ -285,7 +264,6 @@ def create_TL_coef(Bx, By, Bz, meas, add_induced=True, add_eddy=True, lowcut=0.1
     elif filter_params[0] == 'firwin':
         meas_f = apply_firwin_filter(meas,lowcut,highcut,fs,ntaps=filter_params[1],window=filter_params[2])
     elif filter_params == 'None':
-        # no filter
         meas_f = meas
     
     if meas_f.ndim != 2:
@@ -302,7 +280,6 @@ def create_TL_coef(Bx, By, Bz, meas, add_induced=True, add_eddy=True, lowcut=0.1
         elif filter_params[0] == 'firwin':
             A_f[:,i] = apply_firwin_filter(A[:,i],lowcut,highcut,fs,ntaps=filter_params[1],window=filter_params[2])
         elif filter_params == 'None':
-            # no filter
             pass
     
     # trim first/last 20 elements due to filter artifacts
