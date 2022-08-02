@@ -1,4 +1,4 @@
-Magnetic Navigation (currently in progress)
+﻿Magnetic Navigation (currently in progress)
 ==============================
 Magnetic navigation project by Nathan Laoué
 
@@ -36,7 +36,7 @@ You can also download the IGRF model [here](https://earth-planets-space.springer
 
 How to run the Notebooks ?
 ------------
-To use the same data as in this project, a kaggle dataset has been created. You just have to download the data from [here](https://www.kaggle.com/datasets/beff9edcc2a054c1b022fa08c0e0625f8a30b1e5fe113f704a6590c6a72d3aa0) and paste the dezipped data in ```data/raw```. All that remains is to run the notebooks in order and the additional data will be created automatically. There is also a requirements.txt file, just open a terminal and go to the project folder and do ```pip install requirements.txt```. This will download the packages needed to run the project. It is highly recommended to create a virtual environment beforehand.
+To be able to run the notebooks, you have to paste the downloaded flight data (1002, 1003, 1004, 1005, 1006, 1007 flights) in the raw folder. All that remains is to run the notebooks and python scripts in order and the additional data will be created automatically (all steps are in the notebooks). There is also a ```requirements.txt``` file, just open a terminal and go to the project folder and do ```pip install requirements.txt```. This will download the packages needed to run the project. It is highly recommended to create a virtual environment beforehand.
 
 Project Organization
 ------------
@@ -51,7 +51,7 @@ Project Organization
     │
     ├── docs               <- A default Sphinx project; see sphinx-doc.org for details (not implemented)
     │
-    ├── models             <- Trained and serialized models, model predictions, or model summaries (not implemented)
+    ├── models             <- Trained and serialized models, model predictions, or model summaries
     │
     ├── notebooks          <- Jupyter notebooks
     │
@@ -64,19 +64,19 @@ Project Organization
     │                         generated with `pip freeze > requirements.txt`
     │
     ├── setup.py           <- makes project pip installable (pip install -e .) so src can be imported (not implemented)
-    ├── src                <- Source code for use in this project. (not implemented)
+    ├── src                <- Source code for use in this project.
     │   ├── __init__.py    <- Makes src a Python module (not implemented)
     │   │
     │   ├── data           <- Scripts to download or generate data (not implemented)
     │   │   └── make_dataset.py (not implemented)
     │   │
-    │   ├── features       <- Scripts to turn raw data into features for modeling (not implemented)
-    │   │   └── build_features.py (not implemented)
+    │   ├── features       <- Scripts to turn raw data into features for modeling
+    │   │   └── .py (in construction)
     │   │
     │   ├── models         <- Scripts to train models and then use trained models to make
-    │   │   │                 predictions (not implemented)
-    │   │   ├── predict_model.py (not implemented)
-    │   │   └── train_model.py (not implemented)
+    │   │   │                 predictions
+    │   │   └── .py (in construction)
+    │   │   
     │   │
     │   └── visualization  <- Scripts to create exploratory and results oriented visualizations (not implemented)
     │       └── visualize.py (not implemented)
