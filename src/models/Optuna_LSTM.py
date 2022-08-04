@@ -75,18 +75,18 @@ class LSTM(torch.nn.Module):
         out = out[:, -1, :]
         
         for k, linear_k in enumerate(self.linears):
-            if k == self.num_linear-1:
+            if k == self.num_linear:
                 out = linear_k(out)
                 return out
             
             out = F.relu(linear_k(out))
     
 
-def train(network, optimizer, seq_len):
+def train(network, optimizer, seq_len, n_fold, batch_size):
     
-    train_data = MagNavDataset(df_concat, seq_length=seq_len, split='train')          # Train data
+    train_data = MagNavDataset(df_concat, seq_length=seq_len, n_fold=n_fold,split='train') # Train data
     train_loader  = DataLoader(train_data,                                            # Train data loader
-                               batch_size=batch_size_train,
+                               batch_size=batch_size,
                                shuffle=True,
                                num_workers=0,
                                pin_memory=False)
@@ -95,7 +95,7 @@ def train(network, optimizer, seq_len):
     
     for batch_i, (data, target) in enumerate(train_loader):
         
-        if batch_i * batch_size_train > number_of_train_examples:                     # Limit training data for faster computation
+        if batch_i * batch_size > number_of_train_examples:                     # Limit training data for faster computation
             break
 
         optimizer.zero_grad()                                                         # Clear gradients
@@ -116,14 +116,14 @@ def compute_SNR(truth_mag,pred_mag):
     return SNR  
 
 
-def validate(network,seq_len):
+def validate(network,seq_len, n_fold, batch_size):
     
-    val_data   = MagNavDataset(df_concat, seq_length=seq_len, split='val')            # Validation data
+    val_data   = MagNavDataset(df_concat, seq_length=seq_len, n_fold=n_fold,split='test') # Validation data
     
 
 
     val_loader    = DataLoader(val_data,                                              # Validation data loader
-                               batch_size=batch_size_val,
+                               batch_size=batch_size,
                                shuffle=False,
                                num_workers=0,
                                pin_memory=False,
@@ -136,7 +136,7 @@ def validate(network,seq_len):
     with torch.no_grad():                                                             # Disable gradient calculation
         for batch_i, (data, target) in enumerate(val_loader):
             
-            if batch_i * batch_size_val > number_of_val_examples:                     # Limit validation data for faster computation
+            if batch_i * batch_size > number_of_val_examples:                     # Limit validation data for faster computation
                 break
             
             preds.append(network(data.to(device)))                                    # Forward propagation
@@ -149,14 +149,14 @@ def validate(network,seq_len):
     
     return validation_RMSE
 
-# (self, seq_len, drop_lstm1, hidden_size, num_layers, num_LSTM, num_linear, num_neurons):
+
 def objective(trial):
     
-    num_LSTM    = trial.suggest_int('num_lstm_layers',1,10)                           # Number of LSTM layers
+    num_LSTM    = trial.suggest_int('num_lstm_layers',1,5)                           # Number of LSTM layers
     hidden_size = [int(trial.suggest_discrete_uniform(
                       f"hidden_size_{i}",4,512,4)) for i in range(num_LSTM)]          # Hidden size by lstm layers
     num_layers  = [int(trial.suggest_discrete_uniform(
-                      f"layers_lstm_{i}",1,20,1)) for i in range(num_LSTM)]           # Layers by lstm layers
+                      f"layers_lstm_{i}",1,10,1)) for i in range(num_LSTM)]           # Layers by lstm layers
     num_linear  = trial.suggest_int("num_linear_layers",1,3)                          # Number of fully connected layers
     num_neurons = [int(trial.suggest_discrete_uniform(
                       f"num_neurons_{i}",4,1024,4)) for i in range(num_linear)]       # Number of neurons for the FC layers
@@ -170,15 +170,28 @@ def objective(trial):
     lr             = trial.suggest_float("lr", 1e-6, 1e-1, log=True)                  # Learning rates
     optimizer = getattr(optim, optimizer_name)(model.parameters(), lr=lr)             # Optimizer set up
     
-    for epoch in range(n_epochs):
-        train(model, optimizer, seq_len)                                              # Training of the model
-        RMSE = validate(model, seq_len)                                               # Evaluate the model
+#     n_epochs = trial.suggest_int("n_epochs",2,50)
+#     batch_size = int(trial.suggest_discrete_uniform("batch_size",32,2048,32))
+    n_epochs = 1
+    batch_size = 128
+    
+    fold_RMSE = []
+    
+    for n_fold in range(3):
+        model = LSTM(seq_len, drop_lstm1, hidden_size, num_layers, num_LSTM, num_linear, num_neurons).to(device) # Generate the model
+        optimizer = getattr(optim, optimizer_name)(model.parameters(), lr=lr)             # Optimizer set up
+        for epoch in range(n_epochs):
+            train(model, optimizer, seq_len, n_fold, batch_size)                         # Training of the model
+            RMSE = validate(model, seq_len, n_fold, batch_size)                           # Evaluate the model
         
+        fold_RMSE.append(RMSE)
         trial.report(RMSE, epoch)                                                     # Report values
         if trial.should_prune():
             raise optuna.exceptions.TrialPruned()                                     # Prune training (if it is not promising)
             
-    return RMSE
+    total_RMSE = sum(fold_RMSE)/3
+
+    return total_RMSE
 
 
 def trim_data(data,seq_length):
@@ -193,21 +206,38 @@ def trim_data(data,seq_length):
 
 class MagNavDataset(Dataset):
     # split can be 'Train', 'Val', 'Test'
-    def __init__(self, df, seq_length, split):
+    def __init__(self, df, seq_length, n_fold, split):
         
         self.seq_length = seq_length
         
         # Get list of features
-        self.features   = df.drop(columns=['LINE','IGRFMAG1']).columns.to_list()
+        self.features = df.drop(columns=['LINE','IGRFMAG1']).columns.to_list()
+        
+        # Get train sections for fold n
+        train_fold_0 = np.concatenate([df2.LINE.unique(),df3.LINE.unique(),df4.LINE.unique(),df6.LINE.unique()]).tolist()
+        test_fold_0  = df7.LINE.unique().tolist()
+        
+        train_fold_1 = np.concatenate([df3.LINE.unique(),df4.LINE.unique(),df6.LINE.unique(),df7.LINE.unique()]).tolist()
+        test_fold_1  = df2.LINE.unique().tolist()
+        
+        train_fold_2 = np.concatenate([df4.LINE.unique(),df6.LINE.unique(),df7.LINE.unique(),df2.LINE.unique()]).tolist()
+        test_fold_2  = df3.LINE.unique().tolist()
+        
+        if n_fold == 0:
+            self.train_sections = train_fold_0
+            self.test_sections = test_fold_0
+        elif n_fold == 1:
+            self.train_sections = train_fold_1
+            self.test_sections = test_fold_1
+        elif n_fold == 2:
+            self.train_sections = train_fold_2
+            self.test_sections = test_fold_2
+        
         
         if split == 'train':
             
-            # Keeping only 1003, 1002, 1004 and 1006 flight sections for training
-            sections = np.concatenate([df2.LINE.unique(),df3.LINE.unique(),df4.LINE.unique(),df6.LINE.unique()]).tolist()
-            self.sections = sections
-            
             mask_train = pd.Series(dtype=bool)
-            for line in sections:
+            for line in self.train_sections:
                 mask  = (df.LINE == line)
                 mask_train = mask|mask_train
             
@@ -219,25 +249,20 @@ class MagNavDataset(Dataset):
             self.X = torch.t(trim_data(torch.tensor(X_train.to_numpy(),dtype=torch.float32),seq_length))
             self.y = trim_data(torch.tensor(np.reshape(y_train.to_numpy(),[-1,1]),dtype=torch.float32),seq_length)
             
-        elif split == 'val':
+        elif split == 'test':
             
-            # Selecting 1007 for validation except 1007.06
-            val_sections = df7.LINE.unique().tolist()
-            val_sections.remove(1007.06)
-            self.sections = val_sections
-            
-            mask_val = pd.Series(dtype=bool)
-            for line in val_sections:
+            mask_test = pd.Series(dtype=bool)
+            for line in self.test_sections:
                 mask  = (df.LINE == line)
-                mask_val = mask|mask_val
+                mask_test = mask|mask_test
             
-            # Split in X, y for validation
-            X_val      = df.loc[mask_val,self.features]
-            y_val      = df.loc[mask_val,'IGRFMAG1']
+            # Split in X, y for test
+            X_test      = df.loc[mask_test,self.features]
+            y_test      = df.loc[mask_test,'IGRFMAG1']
             
             # Removing data that can't fit in full sequence and convert it to torch tensor
-            self.X = torch.t(trim_data(torch.tensor(X_val.to_numpy(),dtype=torch.float32),seq_length))
-            self.y = trim_data(torch.tensor(np.reshape(y_val.to_numpy(),[-1,1]),dtype=torch.float32),seq_length)
+            self.X = torch.t(trim_data(torch.tensor(X_test.to_numpy(),dtype=torch.float32),seq_length))
+            self.y = trim_data(torch.tensor(np.reshape(y_test.to_numpy(),[-1,1]),dtype=torch.float32),seq_length)
 
     def __getitem__(self, index):
         X = self.X[:,index:(index+self.seq_length)]
@@ -252,16 +277,13 @@ if __name__ == "__main__":
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")             # Use GPU if available for faster computation
     
-    n_epochs = 30                                                                     # Number of training epochs
-    batch_size_train = 64                                                             # batch size for training
-    batch_size_val = 64                                                              # batch size for validation
-    number_of_trials = 200                                                            # Number of Optuna trials
+    number_of_trials = 20                                                              # Number of Optuna trials
     limit_obs = False                                                                 # Limit number of observations for faster computation
     
     
     if limit_obs:
-        number_of_train_examples = 1500 * batch_size_train                            # Max of train observations
-        number_of_val_examples = 5 * batch_size_val                                   # Max of validation observations
+        number_of_train_examples = 1500 * batch_size                            # Max of train observations
+        number_of_val_examples = 5 * batch_size                                   # Max of validation observations
     else:
         number_of_train_examples = 9e6
         number_of_val_examples = 9e6

@@ -95,6 +95,8 @@ target/
 /data/interim/Chall_dataset.h5
 /data/interim/Chall_dataset_csv
 
+/src/models/Optuna_CNN-Copy1.py
+
 # Mac OS-specific storage files
 .DS_Store
 

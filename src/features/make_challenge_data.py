@@ -7,7 +7,7 @@ import datetime
 import os
 
 import sys
-sys.path.insert(0,'notebooks')
+sys.path.insert(0,'src')
 import magnav
 import ppigrf
 
