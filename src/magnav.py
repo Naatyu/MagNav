@@ -17,7 +17,7 @@ def sampling_frequency(df):
     Calculates the sampling frequency of a pandas DataFrame indexed in time.
 
     Arguments:
-    - `df` : Pandas DataFrame
+    - `df` : pandas DataFrame
 
     Returns:
     - `samp_freq` : sampling frequency of the dataset
@@ -93,8 +93,8 @@ def create_butter_filter(lowcut, highcut, fs, order=4):
 
     Arguments:
     - `lowcut, highcut` : critical frequencies of the filter [Hz]
-    - `fs` : sampling frequency [Hz]
-    - `order` : (optional) order of the Butterworth filter
+    - `fs`              : sampling frequency [Hz]
+    - `order`           : (optional) order of the Butterworth filter
 
     Returns:
     - `sos` : second-order representation of the IIR filter
@@ -123,10 +123,10 @@ def apply_butter_filter(data, lowcut, highcut, fs, order=4):
     Apply an Nth-order digital Butterworth filter.
 
     Arguments:
-    - `data` : the data to which the filter should be applied
+    - `data`            : the data to which the filter should be applied
     - `lowcut, highcut` : critical frequencies of the filter [Hz]
-    - `fs` : sampling frequency [Hz]
-    - `order` : (optional) order of the Butterworth filter
+    - `fs`              : sampling frequency [Hz]
+    - `order`           : (optional) order of the Butterworth filter
 
     Returns:
     - `y` : filtered data
@@ -143,9 +143,9 @@ def create_firwin_filter(lowcut, highcut, fs, ntaps=255, window='hamming'):
 
     Arguments:
     - `lowcut, highcut` : critical frequencies of the filter [Hz]
-    - `fs` : sampling frequency [Hz]
-    - `ntaps` : (optional) length of the filter (number of coefficinets), must be odd if it is a pass-band
-    - `window` : (optional) Desired window to use (boxcar, triang, blackman, hamming, hann, ...) see scipy.signal.get_window
+    - `fs`              : sampling frequency [Hz]
+    - `ntaps`           : (optional) length of the filter (number of coefficinets), must be odd if it is a pass-band
+    - `window`          : (optional) Desired window to use (boxcar, triang, blackman, hamming, hann, ...) see scipy.signal.get_window
 
     Returns:
     - `taps` : coefficients of length numtaps FIR filter

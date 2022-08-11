@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+# Insert path for TCN module
+import sys
+sys.path.insert(0,'src')
+
 import pandas as pd
 import numpy as np
 import torch
@@ -10,6 +14,7 @@ from tabulate import tabulate
 from tqdm import tqdm
 import random
 from sklearn.model_selection import KFold
+from TCN import TemporalConvNet
 
 import argparse
 import warnings
@@ -120,100 +125,19 @@ class RMSELoss(torch.nn.Module):
         return loss 
 
 
-# class CNN(torch.nn.Module):
-
-#     def __init__(self,seq_length):
-#         super(CNN,self).__init__()
-
-#         self.layers = torch.nn.Sequential(
-
-#             torch.nn.Conv1d(in_channels  = 11,
-#                             out_channels = 16,
-#                             kernel_size  = 2),
-#             torch.nn.ReLU(),
-#             torch.nn.MaxPool1d(kernel_size = 2,
-#                                stride      = 2),
-#             torch.nn.Conv1d(in_channels  = 16,
-#                             out_channels = 32,
-#                             kernel_size  = 2),
-#             torch.nn.ReLU(),
-#             torch.nn.MaxPool1d(kernel_size = 2,
-#                               stride       = 2),
-
-#             torch.nn.Flatten(),
-#             torch.nn.Linear(768,90),
-#             torch.nn.ReLU(),
-#             torch.nn.Linear(90,20),
-#             torch.nn.ReLU(),
-#             torch.nn.Linear(20,1))
+class TCN(nn.Module):
+    def __init__(self, input_size, output_size, num_channels, kernel_size, dropout):
+        super(TCN, self).__init__()
+        self.tcn = TemporalConvNet(input_size, num_channels, kernel_size=kernel_size, dropout=dropout)
+        self.linear = nn.Linear(num_channels[-1], output_size)
+        self.init_weights()
         
-#         torch.nn.init.kaiming_normal_(self.layers[0].weight, nonlinearity='relu')
-#         torch.nn.init.constant_(self.layers[0].bias, 0)
-#         torch.nn.init.kaiming_normal_(self.layers[3].weight, nonlinearity='relu')
-#         torch.nn.init.constant_(self.layers[3].bias, 0)
-#         torch.nn.init.kaiming_normal_(self.layers[7].weight, nonlinearity='relu')
-# #         torch.nn.init.constant_(self.layers[8].bias, 0)
-#         torch.nn.init.kaiming_normal_(self.layers[9].weight, nonlinearity='relu')
-# #         torch.nn.init.constant_(self.layers[10].bias, 0)
-# #         torch.nn.init.kaiming_normal_(self.layers[12].weight)
-# #         torch.nn.init.constant_(self.layers[12].bias, 0)
-
-#     def forward(self, x):
-#         logits = self.layers(x)
-#         return logits
-    
-class CNN(nn.Module):
-
-    
-    def __init__(self, num_conv_layers, num_filters, num_neurons, drop_conv1, drop_fc1, seq_len):
-
-        super(CNN, self).__init__()                                                   # Initialize parent class
-        in_size = 17                                                                  # Input features size
-        kernel_size = 2                                                               # Conv filter size
+    def init_weights(self):
+        self.linear.weight.data.normal_(0, 0.01)
         
-        # Define conv layers
-        self.convs = nn.ModuleList([nn.Conv1d(in_size, num_filters[0], kernel_size)]) # List with the Conv layers
-        out_size = seq_len - kernel_size + 1                                          # Size after conv layer
-        out_size = int(out_size / 2)                                                  # Size after pooling
-        
-        for i in range(1, num_conv_layers):
-            self.convs.append(nn.Conv1d(num_filters[i-1], num_filters[i], kernel_size))
-            out_size = out_size - kernel_size + 1                                     # Size after conv layer
-            out_size = int(out_size / 2)                                              # Size after pooling
-        
-        self.conv1_drop = nn.Dropout2d(p=drop_conv1)                                  # Dropout for conv1d
-        self.out_feature = num_filters[num_conv_layers-1] * out_size                  # Size after flattened features
-        
-        self.fc1 = nn.Linear(self.out_feature, num_neurons[0])                        # Fully connected layer 1
-        self.fc2 = nn.Linear(num_neurons[0], num_neurons[-1])                         # Fully connected layer 2
-        self.fc3 = nn.Linear(num_neurons[-1], 1)                                      # Fully connected layer 3
-        
-        self.p1 = drop_fc1                                                            # Dropout ratio for FC1
-        
-        # Initialize weights with He initialization
-        for i in range(1, num_conv_layers):
-            nn.init.kaiming_normal_(self.convs[i].weight, nonlinearity='relu')
-            if self.convs[i].bias is not None:
-                nn.init.constant_(self.convs[i].bias, 0)
-        nn.init.kaiming_normal_(self.fc1.weight, nonlinearity='relu')
-        nn.init.kaiming_normal_(self.fc2.weight, nonlinearity='relu')
-    
-    
     def forward(self, x):
-        
-        for i, conv_i in enumerate(self.convs):
-            if i == 2:                                                                # Apply dropout at 2nd layer
-                x = F.relu(F.max_pool1d(self.conv1_drop(conv_i(x)),2))                # Apply conv_i, Dropout, max-pooling(kernel_size =2), ReLU
-            else:
-                x = F.relu(F.max_pool1d(conv_i(x),2))                                 # Apply conv_i, max-pooling(kernel_size=2), ReLU
-        
-        x = x.view(-1, self.out_feature)                                              # Flatten tensor
-        x = F.relu(self.fc1(x))                                                       # Apply FC1, ReLU
-        x = F.dropout(x, p=self.p1, training=self.training)                           # Apply Dropout after FC1 only when training
-        x = F.relu(self.fc2(x))                                                       # Apply FC2, ReLU
-        x = self.fc3(x)                                                               # Apply FC3
-        
-        return x
+        y1 = self.tcn(x)
+        return self.linear(y1.transpose(1, 2))
 
     
 def make_training(model,EPOCHS):
@@ -333,7 +257,7 @@ if __name__ == "__main__":
     EPOCHS     = args.epochs
     BATCH_SIZE = args.batch
     DEVICE     = args.device
-    SEQ_LEN    = 100
+    SEQ_LEN    = 128
     
     # Import Data
     
@@ -377,9 +301,9 @@ if __name__ == "__main__":
                                    pin_memory=False)
 
         # Model
-        model = CNN(3,[16,32,64],[512,64],0.15,0.15,SEQ_LEN).to(DEVICE)
+        model = TCN(17,1,[25,25,25,25,25,25],2,0.1).to(DEVICE)
 #         model = CNN(SEQ_LEN).to(DEVICE)
-        model.name = 'CNN'
+        model.name = 'TCN'
 
         # Loss
         criterion = torch.nn.MSELoss()

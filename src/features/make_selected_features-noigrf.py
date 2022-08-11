@@ -38,10 +38,10 @@ def apply_IGRF_DIURNAL_corrections(df,diurnal=True,igrf=True):
 if __name__ == "__main__":
 
     print('Python script to transform raw data to slected features.(If you have any doubt, please refer to the notebook n°1)\nChoice of  corrections : ')
-    diurnal_choice = int(input("Apply Diurnal correction ? (1 for True, 0 for False)\n"))
-    igrf_choice = int(input("Apply IGRF correction ? (1 for True, 0 for False)\n"))
+#     diurnal_choice = int(input("Apply Diurnal correction ? (1 for True, 0 for False)\n"))
+#     igrf_choice = int(input("Apply IGRF correction ? (1 for True, 0 for False)\n"))
     
-    name = 'DownSelected_Dataset'
+    name = 'DownSelected_Dataset_noigrf'
     
     if os.path.isfile(f'data/processed/{name}.h5'):
         os.remove(f'data/processed/{name}.h5')
@@ -75,20 +75,20 @@ if __name__ == "__main__":
 
         # Tolles Lawson coefficients computation
         TL_coef_4 = magnav.create_TL_coef(tl_cl['FLUXB_X'],tl_cl['FLUXB_Y'],tl_cl['FLUXB_Z'],tl_cl['UNCOMPMAG4'],
-                                      lowcut=lowcut,highcut=highcut,fs=fs,filter_params=filt, ridge=0.025)
+                                      lowcut=lowcut,highcut=highcut,fs=fs,filter_params=filt)
         TL_coef_5 = magnav.create_TL_coef(tl_cl['FLUXB_X'],tl_cl['FLUXB_Y'],tl_cl['FLUXB_Z'],tl_cl['UNCOMPMAG5'],
-                                      lowcut=lowcut,highcut=highcut,fs=fs,filter_params=filt, ridge=0.025)
+                                      lowcut=lowcut,highcut=highcut,fs=fs,filter_params=filt)
 
         # Magnetometers correction
         df['TL_comp_mag4_cl'] = np.reshape(df['UNCOMPMAG4'].tolist(),(-1,1))-np.dot(A,TL_coef_4)+np.mean(np.dot(A,TL_coef_4))
         df['TL_comp_mag5_cl'] = np.reshape(df['UNCOMPMAG5'].tolist(),(-1,1))-np.dot(A,TL_coef_5)+np.mean(np.dot(A,TL_coef_5))
 
         # IGRF and diurnal correction
-        COR_df = apply_IGRF_DIURNAL_corrections(df,diurnal=diurnal_choice,igrf=igrf_choice)
+        COR_df = apply_IGRF_DIURNAL_corrections(df,diurnal=False,igrf=False)
         
         # Selected features
         features = ['TL_comp_mag5_cl','TL_comp_mag4_cl','V_BAT1','V_BAT2','INS_VEL_N','INS_VEL_W','INS_VEL_V','BARO','CUR_IHTR',
-                    'CUR_ACLo','CUR_ACHi','CUR_TANK','CUR_FLAP','V_BLOCK','PITCH','ROLL','AZIMUTH','LINE','IGRFMAG1']
+                    'CUR_ACLo','CUR_ACHi','CUR_TANK','CUR_FLAP','V_BLOCK','PITCH','ROLL','AZIMUTH','LINE','COMPMAG1']
 
         # export to HDF5
         COR_df[features].to_hdf(f'data/processed/{name}.h5',key=f'Flt100{n}')

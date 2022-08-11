@@ -120,100 +120,107 @@ class RMSELoss(torch.nn.Module):
         return loss 
 
 
-# class CNN(torch.nn.Module):
-
-#     def __init__(self,seq_length):
-#         super(CNN,self).__init__()
-
-#         self.layers = torch.nn.Sequential(
-
-#             torch.nn.Conv1d(in_channels  = 11,
-#                             out_channels = 16,
-#                             kernel_size  = 2),
-#             torch.nn.ReLU(),
-#             torch.nn.MaxPool1d(kernel_size = 2,
-#                                stride      = 2),
-#             torch.nn.Conv1d(in_channels  = 16,
-#                             out_channels = 32,
-#                             kernel_size  = 2),
-#             torch.nn.ReLU(),
-#             torch.nn.MaxPool1d(kernel_size = 2,
-#                               stride       = 2),
-
-#             torch.nn.Flatten(),
-#             torch.nn.Linear(768,90),
-#             torch.nn.ReLU(),
-#             torch.nn.Linear(90,20),
-#             torch.nn.ReLU(),
-#             torch.nn.Linear(20,1))
-        
-#         torch.nn.init.kaiming_normal_(self.layers[0].weight, nonlinearity='relu')
-#         torch.nn.init.constant_(self.layers[0].bias, 0)
-#         torch.nn.init.kaiming_normal_(self.layers[3].weight, nonlinearity='relu')
-#         torch.nn.init.constant_(self.layers[3].bias, 0)
-#         torch.nn.init.kaiming_normal_(self.layers[7].weight, nonlinearity='relu')
-# #         torch.nn.init.constant_(self.layers[8].bias, 0)
-#         torch.nn.init.kaiming_normal_(self.layers[9].weight, nonlinearity='relu')
-# #         torch.nn.init.constant_(self.layers[10].bias, 0)
-# #         torch.nn.init.kaiming_normal_(self.layers[12].weight)
-# #         torch.nn.init.constant_(self.layers[12].bias, 0)
-
-#     def forward(self, x):
-#         logits = self.layers(x)
-#         return logits
+class LSTM(torch.nn.Module):
     
-class CNN(nn.Module):
+    def __init__(self, seq_len, drop_lstm1, hidden_size, num_layers, num_LSTM, num_linear, num_neurons):
+        
+        super(LSTM, self).__init__()
+        self.num_LSTM = num_LSTM
+        self.num_linear = num_linear
+        self.hidden_size = hidden_size
+        self.drop_lstm1 = drop_lstm1
+        self.num_layers = num_layers
+        self.lstms = nn.ModuleList()
+        self.linears = nn.ModuleList()
+        
+        for k in range(num_LSTM):
+            if k == 0:
+                self.lstms.append(nn.LSTM(seq_len, hidden_size[0], num_layers[0], batch_first=True))
+                self.lstms.append(nn.Dropout(self.drop_lstm1))
+                continue
+                
+            self.lstms.append(nn.LSTM(hidden_size[k-1], hidden_size[k], num_layers[k], batch_first=True))
+            
+        for n in range(num_linear):
+            if n == 0:
+                self.linears.append(nn.Linear(hidden_size[-1], num_neurons[0]))
+                continue
+            
+            self.linears.append(nn.Linear(num_neurons[n-1], num_neurons[n]))
+        
+        self.linears.append(nn.Linear(num_neurons[-1],1))
+            
+        for k in range(len(self.lstms)):
+            if k == 1:
+                continue
+            
+            nn.init.kaiming_normal_(self.lstms[k]._parameters['weight_ih_l0'])
+            nn.init.kaiming_normal_(self.lstms[k]._parameters['weight_hh_l0'])
+            if self.lstms[k].bias is not None:
+                nn.init.constant_(self.lstms[k]._parameters['bias_ih_l0'], 0)
+                nn.init.constant_(self.lstms[k]._parameters['bias_hh_l0'], 0)
+        
+        for k in range(num_linear):
+            nn.init.kaiming_normal_(self.linears[k].weight)
+            if self.linears[k].bias is not None:
+                nn.init.constant_(self.linears[k].bias, 0)
 
-    
-    def __init__(self, num_conv_layers, num_filters, num_neurons, drop_conv1, drop_fc1, seq_len):
-
-        super(CNN, self).__init__()                                                   # Initialize parent class
-        in_size = 17                                                                  # Input features size
-        kernel_size = 2                                                               # Conv filter size
-        
-        # Define conv layers
-        self.convs = nn.ModuleList([nn.Conv1d(in_size, num_filters[0], kernel_size)]) # List with the Conv layers
-        out_size = seq_len - kernel_size + 1                                          # Size after conv layer
-        out_size = int(out_size / 2)                                                  # Size after pooling
-        
-        for i in range(1, num_conv_layers):
-            self.convs.append(nn.Conv1d(num_filters[i-1], num_filters[i], kernel_size))
-            out_size = out_size - kernel_size + 1                                     # Size after conv layer
-            out_size = int(out_size / 2)                                              # Size after pooling
-        
-        self.conv1_drop = nn.Dropout2d(p=drop_conv1)                                  # Dropout for conv1d
-        self.out_feature = num_filters[num_conv_layers-1] * out_size                  # Size after flattened features
-        
-        self.fc1 = nn.Linear(self.out_feature, num_neurons[0])                        # Fully connected layer 1
-        self.fc2 = nn.Linear(num_neurons[0], num_neurons[-1])                         # Fully connected layer 2
-        self.fc3 = nn.Linear(num_neurons[-1], 1)                                      # Fully connected layer 3
-        
-        self.p1 = drop_fc1                                                            # Dropout ratio for FC1
-        
-        # Initialize weights with He initialization
-        for i in range(1, num_conv_layers):
-            nn.init.kaiming_normal_(self.convs[i].weight, nonlinearity='relu')
-            if self.convs[i].bias is not None:
-                nn.init.constant_(self.convs[i].bias, 0)
-        nn.init.kaiming_normal_(self.fc1.weight, nonlinearity='relu')
-        nn.init.kaiming_normal_(self.fc2.weight, nonlinearity='relu')
-    
-    
+            
     def forward(self, x):
         
-        for i, conv_i in enumerate(self.convs):
-            if i == 2:                                                                # Apply dropout at 2nd layer
-                x = F.relu(F.max_pool1d(self.conv1_drop(conv_i(x)),2))                # Apply conv_i, Dropout, max-pooling(kernel_size =2), ReLU
-            else:
-                x = F.relu(F.max_pool1d(conv_i(x),2))                                 # Apply conv_i, max-pooling(kernel_size=2), ReLU
+        for k, lstm_k in enumerate(self.lstms):
+            if k == 0:
+                h = torch.zeros(self.num_layers[k], x.size(0), self.hidden_size[k]).to('cuda')
+                c = torch.zeros(self.num_layers[k], x.size(0), self.hidden_size[k]).to('cuda')
+
+                out, _ = lstm_k(x, (h,c))
+#                 out = F.dropout(out,self.drop_lstm1)
+                continue
+            
+            if k == 1:
+                out = lstm_k(out)
+                continue
+                                   
+            h = torch.zeros(self.num_layers[k-1], x.size(0), self.hidden_size[k-1]).to('cuda')
+            c = torch.zeros(self.num_layers[k-1], x.size(0), self.hidden_size[k-1]).to('cuda')
+
+            out, _ = lstm_k(out, (h,c))
         
-        x = x.view(-1, self.out_feature)                                              # Flatten tensor
-        x = F.relu(self.fc1(x))                                                       # Apply FC1, ReLU
-        x = F.dropout(x, p=self.p1, training=self.training)                           # Apply Dropout after FC1 only when training
-        x = F.relu(self.fc2(x))                                                       # Apply FC2, ReLU
-        x = self.fc3(x)                                                               # Apply FC3
+        out = out[:, -1, :]
         
-        return x
+        for k, linear_k in enumerate(self.linears):
+            if k == self.num_linear:
+                out = linear_k(out)
+                return out
+            
+            out = F.relu(linear_k(out))
+# class LSTM(torch.nn.Module):
+#     def __init__(self, seq_len):
+#         super(LSTM, self).__init__()
+#         self.lstm1 = torch.nn.LSTM(seq_len, 64, 1, batch_first=True)
+#         self.dropout = torch.nn.Dropout(0.2)
+#         self.lstm2 = torch.nn.LSTM(64, 32, 2, batch_first=True)
+#         self.lstm3 = torch.nn.LSTM(32, 16, 2, batch_first=True)
+#         self.fc = torch.nn.Linear(16,1)
+    
+#     def forward(self, x):
+#         h1 = torch.zeros(1, x.size(0), 64).to('cuda')
+#         c1 = torch.zeros(1, x.size(0), 64).to('cuda')
+        
+#         h2 = torch.zeros(2, x.size(0), 32).to('cuda')
+#         c2 = torch.zeros(2, x.size(0), 32).to('cuda')
+    
+#         h3 = torch.zeros(2, x.size(0), 16).to('cuda')
+#         c3 = torch.zeros(2, x.size(0), 16).to('cuda')
+        
+#         out, hidden = self.lstm1(x, (h1,c1))
+#         out = self.dropout(out)
+#         out, hidden = self.lstm2(out, (h2,c2))
+#         out, hidden = self.lstm3(out, (h3,c3))
+#         out = out[:, -1, :]
+#         out = self.fc(out)
+        
+#         return out
 
     
 def make_training(model,EPOCHS):
@@ -337,11 +344,11 @@ if __name__ == "__main__":
     
     # Import Data
     
-    df2 = pd.read_hdf('./data/processed/DownSelected_Dataset.h5', key=f'Flt1002')
-    df3 = pd.read_hdf('./data/processed/DownSelected_Dataset.h5', key=f'Flt1003')
-    df4 = pd.read_hdf('./data/processed/DownSelected_Dataset.h5', key=f'Flt1004')
-    df6 = pd.read_hdf('./data/processed/DownSelected_Dataset.h5', key=f'Flt1006')
-    df7 = pd.read_hdf('./data/processed/DownSelected_Dataset.h5', key=f'Flt1007')
+    df2 = pd.read_hdf('./data/processed/Chall_dataset.h5', key=f'Flt1002')
+    df3 = pd.read_hdf('./data/processed/Chall_dataset.h5', key=f'Flt1003')
+    df4 = pd.read_hdf('./data/processed/Chall_dataset.h5', key=f'Flt1004')
+    df6 = pd.read_hdf('./data/processed/Chall_dataset.h5', key=f'Flt1006')
+    df7 = pd.read_hdf('./data/processed/Chall_dataset.h5', key=f'Flt1007')
     
     scaling = 'none'
     
@@ -375,11 +382,21 @@ if __name__ == "__main__":
                                    shuffle=False,
                                    num_workers=0,
                                    pin_memory=False)
+        
+        num_LSTM    = 3                                                                   # Number of LSTM layers
+        hidden_size = [64,32,16]          # Hidden size by lstm layers
+        num_layers  = [1,2,2]           # Layers by lstm layers
+        num_linear  = 1                          # Number of fully connected layers
+        num_neurons = [16]       # Number of neurons for the FC layers
+        drop_lstm1  = 0.2                             # Drop for 1st LSTM layer
 
         # Model
-        model = CNN(3,[16,32,64],[512,64],0.15,0.15,SEQ_LEN).to(DEVICE)
-#         model = CNN(SEQ_LEN).to(DEVICE)
-        model.name = 'CNN'
+        model = LSTM(SEQ_LEN, drop_lstm1, hidden_size, num_layers, 
+                 num_LSTM, num_linear, num_neurons).to(DEVICE)
+#         model = LSTM(SEQ_LEN).to(DEVICE)
+        model.name = 'LSTM'
+        
+        print(model)
 
         # Loss
         criterion = torch.nn.MSELoss()

@@ -172,7 +172,7 @@ def objective(trial):
     
 #     n_epochs = trial.suggest_int("n_epochs",2,50)
 #     batch_size = int(trial.suggest_discrete_uniform("batch_size",32,2048,32))
-    n_epochs = 1
+    n_epochs = 35
     batch_size = 128
     
     fold_RMSE = []
@@ -277,7 +277,7 @@ if __name__ == "__main__":
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")             # Use GPU if available for faster computation
     
-    number_of_trials = 20                                                              # Number of Optuna trials
+    number_of_trials = 50                                                              # Number of Optuna trials
     limit_obs = False                                                                 # Limit number of observations for faster computation
     
     
