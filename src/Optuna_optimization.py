@@ -14,57 +14,8 @@ from datetime import datetime
 import joblib
 import math
 
+from models.CNN import Optuna_CNN
 
-class CNN(torch.nn.Module):
-
-    def __init__(self,seq_length,n_features,n_convblock=2,filters=[32,64], num_neurons=[256,128]):
-        super(CNN,self).__init__()
-        
-        # Raise Error if number of conv blocks don't match number of filters
-        if type(filters) != list:
-            raise TypeError ("Filter should be a list (if only 1 filter put in 1 element list. Ex : filter = [8])")
-
-        if len(filters) != n_convblock:
-            raise ValueError ("Number of convolutional blocks and number of filters doesn't match")
-        
-        self.architecture = torch.nn.Sequential()
-        
-        for i in range(n_convblock):
-
-            if i == 0:
-                self.architecture.add_module(f'conv_{i+1}',
-                                            torch.nn.Conv1d(in_channels  = n_features,
-                                                            out_channels = filters[i],
-                                                            kernel_size  = 3,
-                                                            stride       = 1,
-                                                            padding      = 1,
-                                                            padding_mode = 'zeros'))
-                self.architecture.add_module(f'relu_{i+1}',torch.nn.ReLU())
-                self.architecture.add_module(f'maxpool_{i+1}',torch.nn.MaxPool1d(kernel_size = 2,stride = 2))
-                                             
-            else:
-                self.architecture.add_module(f'conv_{i+1}',
-                        torch.nn.Conv1d(in_channels  = filters[i-1],
-                                        out_channels = filters[i],
-                                        kernel_size  = 3,
-                                        stride       = 1,
-                                        padding      = 1,
-                                        padding_mode = 'zeros'))
-                self.architecture.add_module(f'relu_{i+1}',torch.nn.ReLU())
-                self.architecture.add_module(f'maxpool_{i+1}',torch.nn.MaxPool1d(kernel_size = 2,stride = 2))
-            
-
-        self.architecture.add_module('flatten',torch.nn.Flatten())
-        self.architecture.add_module('linear_1',torch.nn.Linear(filters[-1]*math.floor(seq_length/(2**n_convblock)),num_neurons[0]))
-        self.architecture.add_module(f'relu_{n_convblock+1}',torch.nn.ReLU())
-        self.architecture.add_module('linear_2',torch.nn.Linear(num_neurons[0],num_neurons[1]))
-        self.architecture.add_module(f'relu_{n_convblock+2}',torch.nn.ReLU())
-        self.architecture.add_module('linear_3',torch.nn.Linear(num_neurons[1],1))
-
-    def forward(self, x):
-        logits = self.architecture(x)
-        return logits
-    
 
 def train(network, optimizer, seq_len, n_fold, batch_size):
     
@@ -154,7 +105,7 @@ def objective(trial):
     fold_RMSE = []
     
     for n_fold in range(3):
-        model = CNN(seq_len, 11, num_conv_layers, num_filters,num_neurons).to(device) # Generate the model
+        model = Optuna_CNN(seq_len, 11, num_conv_layers, num_filters,num_neurons).to(device) # Generate the model
         optimizer = getattr(optim, optimizer_name)(model.parameters(), lr=lr)             # Optimizer set up
         for epoch in range(n_epochs):
             train(model, optimizer, seq_len, n_fold, batch_size)                         # Training of the model
@@ -193,9 +144,6 @@ class MagNavDataset(Dataset):
         train_fold_0 = np.concatenate([df2.LINE.unique(),df3.LINE.unique(),df4.LINE.unique(),df6.LINE.unique()]).tolist()
         test_fold_0  = df7.LINE.unique().tolist()
         
-        train_fold_1 = np.concatenate([df3.LINE.unique(),df4.LINE.unique(),df6.LINE.unique(),df7.LINE.unique()]).tolist()
-        test_fold_1  = df2.LINE.unique().tolist()
-        
         train_fold_2 = np.concatenate([df4.LINE.unique(),df6.LINE.unique(),df7.LINE.unique(),df2.LINE.unique()]).tolist()
         test_fold_2  = df3.LINE.unique().tolist()
         
@@ -205,9 +153,6 @@ class MagNavDataset(Dataset):
         elif n_fold == 1:
             self.train_sections = train_fold_1
             self.test_sections = test_fold_1
-        elif n_fold == 2:
-            self.train_sections = train_fold_2
-            self.test_sections = test_fold_2
         
         
         if split == 'train':

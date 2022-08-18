@@ -9,7 +9,6 @@ import os
 import sys
 sys.path.insert(0,'src')
 import magnav
-import ppigrf
 
 # Be sure to be at MagNav root directory
 
@@ -27,7 +26,7 @@ def apply_corrections(df,diurnal=True,igrf=True):
     lon  = COR_df['LONG']
     h    = COR_df['BARO']*1e-3 # Kilometers above WGS84 ellipsoid
     date = datetime.datetime(2020, 6, 29) # Date on which the flights were made
-    Be, Bn, Bu = ppigrf.igrf(lon,lat,h,date)
+    Be, Bn, Bu = magnav.igrf(lon,lat,h,date)
     
     if igrf == True:
         COR_df[mag_measurements] = COR_df[mag_measurements]-np.reshape(np.sqrt(Be**2+Bn**2+Bu**2)[0],[-1,1])
@@ -79,7 +78,7 @@ if __name__ == "__main__":
 
         # Get selected features
         features = ['TL_comp_mag3_cl','TL_comp_mag5_cl','V_BAT1','V_BAT2',
-                    'INS_ACC_X','INS_ACC_Y','INS_ACC_Z','CUR_IHTR','PITCH','ROLL','AZIMUTH','LINE','IGRFMAG1']
+                    'INS_ACC_X','INS_ACC_Y','INS_ACC_Z','CUR_IHTR','PITCH','ROLL','AZIMUTH','LINE','IGRFMAG1','COMPMAG1']
 
         # export to HDF5
         COR_df[features].to_hdf(f'data/processed/Chall_dataset.h5',key=f'Flt100{n}')
