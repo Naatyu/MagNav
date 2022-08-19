@@ -11,24 +11,23 @@ import os
 import sys
 sys.path.insert(0,'src')
 import magnav
-import ppigrf
 
 def apply_IGRF_DIURNAL_corrections(df,diurnal=True,igrf=True):
-    
+
     mag_measurements = np.array(['TL_comp_mag4_cl','TL_comp_mag5_cl'])
     COR_df = df
     
     # Diurnal cor
     if diurnal == True:
         COR_df[mag_measurements] = COR_df[mag_measurements]-np.reshape(COR_df['DIURNAL'].values,[-1,1])
-    
+
     # IGRF cor
     lat  = COR_df['LAT']
     lon  = COR_df['LONG']
     h    = COR_df['BARO']*1e-3 # Kilometers above WGS84 ellipsoid
     date = datetime.datetime(2020, 6, 29) # Date on which the flights were made
-    Be, Bn, Bu = ppigrf.igrf(lon,lat,h,date)
-    
+    Be, Bn, Bu = magnav.igrf(lon,lat,h,date)
+
     if igrf == True:
         COR_df[mag_measurements] = COR_df[mag_measurements]-np.reshape(np.sqrt(Be**2+Bn**2+Bu**2)[0],[-1,1])
 
@@ -88,7 +87,7 @@ if __name__ == "__main__":
         
         # Selected features
         features = ['TL_comp_mag5_cl','TL_comp_mag4_cl','V_BAT1','V_BAT2','INS_VEL_N','INS_VEL_W','INS_VEL_V','BARO','CUR_IHTR',
-                    'CUR_ACLo','CUR_ACHi','CUR_TANK','CUR_FLAP','V_BLOCK','PITCH','ROLL','AZIMUTH','LINE','IGRFMAG1']
+                    'CUR_ACLo','CUR_ACHi','CUR_TANK','CUR_FLAP','V_BLOCK','PITCH','ROLL','AZIMUTH','LINE','IGRFMAG1','COMPMAG1']
 
         # export to HDF5
         COR_df[features].to_hdf(f'data/processed/{name}.h5',key=f'Flt100{n}')

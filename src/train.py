@@ -24,8 +24,8 @@ import magnav
 #-----------------#
 #----Functions----#
 #-----------------#
-
-
+    
+    
 def trim_data(data, seq_len):
     '''
     Delete part of the training data so that the remainder of the Euclidean division between the length of the data and the size of a sequence is 0. This ensures that all sequences are complete.
@@ -41,10 +41,10 @@ def trim_data(data, seq_len):
         data = data[:-(len(data)%seq_len)]
     else:
         pass
-        
+    
     return data
-
-
+    
+    
 class MagNavDataset(Dataset):
     '''
     Transform Pandas dataframe of flights data into a custom PyTorch dataset that returns the data into sequences of a desired length.
@@ -64,7 +64,7 @@ class MagNavDataset(Dataset):
         - None
         '''
         self.seq_len  = seq_len
-        self.features = df.drop(columns=['LINE','IGRFMAG1','COMPMAG1']).columns.to_list()
+        self.features = df.drop(columns=['LINE',truth]).columns.to_list()
         
         # Fold 0 - flights 1002, 1003, 1004 and 1006 for training and flight 1007 for testing
         train_fold_0 = np.concatenate([df2.LINE.unique(),df3.LINE.unique(),df4.LINE.unique(),df6.LINE.unique()]).tolist()
@@ -283,6 +283,39 @@ def MinMax_scaling(df, bound=[-1,1]):
     
     return df_scaled
 
+
+def apply_corrections(df,mags_to_cor,diurnal=True,igrf=True):
+    '''
+    Apply IGRF and/or diurnal corrections on data.
+    
+    Arguments:
+    - `df` : dataframe to correct
+    - `mags_to_cor` : list of string of magnetometers to be corrected
+    - `diurnal` : (optional) apply diunal correction (True or False)
+    - `igrf` : (optional) apply IGRF correction (True or False)
+    
+    Returns:
+    - `df_cor` : corrected dataframe
+    '''
+    mag_measurements = np.array(mags_to_cor)
+    df_cor = df.copy()
+    
+    # Diurnal cor
+    if diurnal == True:
+        df_cor[mag_measurements] = df_cor[mag_measurements]-np.reshape(df_cor['DIURNAL'].values,[-1,1])
+    
+    # IGRF cor
+    lat  = df_cor['LAT']
+    lon  = df_cor['LONG']
+    h    = df_cor['BARO']*1e-3
+    date = datetime.datetime(2020, 6, 29) # Date on which the flights were made
+    Be, Bn, Bu = magnav.igrf(lon,lat,h,date)
+    
+    if igrf == True:
+        df_cor[mag_measurements] = df_cor[mag_measurements]-np.reshape(np.sqrt(Be**2+Bn**2+Bu**2)[0],[-1,1])
+
+    return df_cor
+
     
 #------------#
 #----Main----#
@@ -319,7 +352,10 @@ if __name__ == "__main__":
         "--shut", action="store_true", required=False, help="Shutdown pc after training is done."
     )
     parser.add_argument(
-        "-sc", "--scaling", type=str, required=False, default='None', help="Data scaling, 'std' for standardization, 'minmax' for MinMax scaling, 'None' for no scaling, default='None'. Ex : --scaling 'std'", metavar=''
+        "-sc", "--scaling", type=int, required=False, default=0, help="Data scaling, 1 for standardization, 2 for MinMax scaling, 0 for no scaling, default=0. Ex : --scaling 0", metavar=''
+    )
+    parser.add_argument(
+        "-cor", "--corrections", type=int, required=False, default=3, help="Data correction, 0 for no corrections, 1 for IGRF correction, 2 for diurnal correction, 3 for IGRF+diurnal correction. Ex : --corrections 3", metavar=''
     )
     
     args = parser.parse_args()
@@ -329,49 +365,111 @@ if __name__ == "__main__":
     DEVICE     = args.device
     SEQ_LEN    = args.seq
     SCALING    = args.scaling
+    COR        = agrs.corrections
     
     print(f'\nCurrently training on {torch.cuda.get_device_name(DEVICE)}')
 
     #----Import data----#
-    
-#     df2 = pd.read_hdf('./data/processed/DownSelected_Dataset.h5', key=f'Flt1002')
-#     df3 = pd.read_hdf('./data/processed/DownSelected_Dataset.h5', key=f'Flt1003')
-#     df4 = pd.read_hdf('./data/processed/DownSelected_Dataset.h5', key=f'Flt1004')
-#     df6 = pd.read_hdf('./data/processed/DownSelected_Dataset.h5', key=f'Flt1006')
-#     df7 = pd.read_hdf('./data/processed/DownSelected_Dataset.h5', key=f'Flt1007')
 
-    df2 = pd.read_hdf('./data/processed/Chall_dataset.h5', key=f'Flt1002')
-    df3 = pd.read_hdf('./data/processed/Chall_dataset.h5', key=f'Flt1003')
-    df4 = pd.read_hdf('./data/processed/Chall_dataset.h5', key=f'Flt1004')
-    df6 = pd.read_hdf('./data/processed/Chall_dataset.h5', key=f'Flt1006')
-    df7 = pd.read_hdf('./data/processed/Chall_dataset.h5', key=f'Flt1007')
+    # df2 = pd.read_hdf('./data/processed/Chall_dataset.h5', key=f'Flt1002')
+    # df3 = pd.read_hdf('./data/processed/Chall_dataset.h5', key=f'Flt1003')
+    # df4 = pd.read_hdf('./data/processed/Chall_dataset.h5', key=f'Flt1004')
+    # df6 = pd.read_hdf('./data/processed/Chall_dataset.h5', key=f'Flt1006')
+    # df7 = pd.read_hdf('./data/processed/Chall_dataset.h5', key=f'Flt1007')
+    # df2 = pd.read_hdf('./data/processed/Flt_data.h5', key=f'Flt1002')
+    # df3 = pd.read_hdf('./data/processed/Flt_data.h5', key=f'Flt1003')
+    # df4 = pd.read_hdf('./data/processed/Flt_data.h5', key=f'Flt1004')
+    # df6 = pd.read_hdf('./data/processed/Flt_data.h5', key=f'Flt1006')
+    # df7 = pd.read_hdf('./data/processed/Flt_data.h5', key=f'Flt1007')
     
-    #----Data corrections----#
+    flights = {}
+    flights_num = [2,3,4,6,7]
     
+    for n in flights_num:
+        df = pd.read_hdf('./data/processed/Flt_data.h5', key=f'Flt100{n}')
+        flights[n] = df
     
+    #----Apply Tolles-Lawson----#
+    
+    # Get cloverleaf pattern data
+    mask = (flights[2].LINE == 1002.20)
+    tl_pattern = flights[2][mask]
+
+    # filter parameters
+    fs      = 10.0
+    lowcut  = 0.1
+    highcut = 0.9
+    filt    = ['Butterworth',4]
+    
+    for n in tqdm(flights_num)
+    
+        # A matrix of Tolles-Lawson
+        A = magnav.create_TL_A(flights[n]['FLUXB_X'],flights[n]['FLUXB_Y'],flights[n]['FLUXB_Z'])
+
+        # Tolles Lawson coefficients computation
+        TL_coef_4 = magnav.create_TL_coef(tl_pattern['FLUXB_X'],tl_pattern['FLUXB_Y'],tl_pattern['FLUXB_Z'],tl_pattern['UNCOMPMAG4'],
+                                      lowcut=lowcut,highcut=highcut,fs=fs,filter_params=filt)
+        TL_coef_5 = magnav.create_TL_coef(tl_pattern['FLUXB_X'],tl_pattern['FLUXB_Y'],tl_pattern['FLUXB_Z'],tl_pattern['UNCOMPMAG5'],
+                                      lowcut=lowcut,highcut=highcut,fs=fs,filter_params=filt)
+
+        # Magnetometers correction
+        flights[n]['TL_comp_mag4_cl'] = magnav.apply_TL(np.reshape(flights[n]['UNCOMPMAG4'].tolist(),(-1,1)), TL_coef_4, A)
+        flights[n]['TL_comp_mag5_cl'] = magnav.apply_TL(np.reshape(flights[n]['UNCOMPMAG5'].tolist(),(-1,1)), TL_coef_5, A)
+        
+    #----Apply IGRF and diurnal corrections----#
+    
+    flights_cor = {}
+    mags_to_cor = ['TL_comp_mag4_cl', 'TL_comp_mag5_cl']
+    
+    if COR == 0:
+        flights_cor = flights.copy()
+        truth = 'COMPMAG1'
+    if COR == 1:
+        for n in flights_num:
+            flights_cor[n] = apply_corrections(flights[n], mags_to_cor, diurnal=False, igrf=True)
+        truth = 'IGRFMAG1'
+    if COR == 2: 
+        for n in flights_num:
+            flights_cor[n] = apply_corrections(flights[n], mags_to_cor, diurnal=True, igrf=False)
+        truth = 'DCMAG1'
+    if COR == 3:
+        for n in flights_num:
+            flights_cor[n] = apply_corrections(flights[n], mags_to_cor, diurnal=True, igrf=True)
+        truth = 'IGRFMAG1'
+        
+    #----Select features----#
+    
+    # Always keep the 'LINE' feature in the feature list so that the MagNavDataset function can split the flight data
+    features = ['TL_comp_mag3_cl','TL_comp_mag5_cl','V_BAT1','V_BAT2',
+                    'INS_ACC_X','INS_ACC_Y','INS_ACC_Z','CUR_IHTR','PITCH','ROLL','AZIMUTH','LINE',truth]
+    
+    dataset = {}
+    
+    for n in flights_num:
+        dataset[n] = flights_cor[n][features]
     
     #----Data scaling----#
     
-    if SCALING == 'None':
-        df = pd.concat([df2,df3,df4,df6,df7],ignore_index=True,axis=0)
-        scaling = ['None']
-    elif SCALING == 'minmax':
-        bound = [-1,1]
-        df2_scaled = MinMax_scaling(df2, bound=bound)
-        df3_scaled = MinMax_scaling(df3, bound=bound)
-        df4_scaled = MinMax_scaling(df4, bound=bound)
-        df6_scaled = MinMax_scaling(df6, bound=bound)
-        df7_scaled = MinMax_scaling(df7, bound=bound)
-        df = pd.concat([df2_scaled,df3_scaled,df4_scaled,df6_scaled,df7_scaled],ignore_index=True,axis=0)
+    # if SCALING == 0:
+    #     df = pd.concat([df2,df3,df4,df6,df7],ignore_index=True,axis=0)
+    #     scaling = ['None']
+    # elif SCALING == 2:
+    #     bound = [-1,1]
+    #     df2_scaled = MinMax_scaling(df2, bound=bound)
+    #     df3_scaled = MinMax_scaling(df3, bound=bound)
+    #     df4_scaled = MinMax_scaling(df4, bound=bound)
+    #     df6_scaled = MinMax_scaling(df6, bound=bound)
+    #     df7_scaled = MinMax_scaling(df7, bound=bound)
+    df = pd.concat([dataset[2],dataset[3],dataset[4],dataset[6],dataset[7]],ignore_index=True,axis=0)
 #         scaling = ['minmax',bound[0],bound[1],df3[truth].min(),df3[truth].max()]
-    elif SCALING == 'std':
-        df2_scaled = Standard_scaling(df2)
-        df3_scaled = Standard_scaling(df3)
-        df4_scaled = Standard_scaling(df4)
-        df6_scaled = Standard_scaling(df6)
-        df7_scaled = Standard_scaling(df7)
-        df = pd.concat([df2_scaled,df3_scaled,df4_scaled,df6_scaled,df7_scaled],ignore_index=True,axis=0)
-        scaling = ['std']
+    # elif SCALING == 1:
+    #     df2_scaled = Standard_scaling(df2)
+    #     df3_scaled = Standard_scaling(df3)
+    #     df4_scaled = Standard_scaling(df4)
+    #     df6_scaled = Standard_scaling(df6)
+    #     df7_scaled = Standard_scaling(df7)
+    #     df = pd.concat([df2_scaled,df3_scaled,df4_scaled,df6_scaled,df7_scaled],ignore_index=True,axis=0)
+    #     scaling = ['std']
     
     #----Training----#
     

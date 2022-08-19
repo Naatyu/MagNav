@@ -28,7 +28,6 @@ def sampling_frequency(df):
     Returns:
     - `samp_freq` : sampling frequency of the dataset
     """
-    
     duration  = df.index[-1]-df.index[0]
     samp_freq = np.shape(df)[0]/duration
     
@@ -45,7 +44,6 @@ def to_hms(seconds):
     Returns:
     - `hms_format` : seconds converted to h:m:s format
     """
-    
     hms_format = time.strftime("%Hh:%Mm:%Ss",time.gmtime(seconds))
     
     return hms_format
@@ -61,7 +59,6 @@ def get_random_color():
     Returns:
     - `rand_col` : random color in HEX format 
     """
-    
     rand_col = "#"+''.join([random.choice('0123456789ABCDEF') for j in range(6)])
     
     return rand_col
@@ -81,7 +78,6 @@ def rmse(y_pred, y_true, subtract_mean=True):
     Returns:
     - `err` : root-mean-squared error
     """
-    
     if subtract_mean:
         err = np.sqrt(mean_squared_error(y_true - y_true.mean(), 
                                          y_pred - y_pred.mean()))
@@ -108,7 +104,6 @@ def create_butter_filter(lowcut, highcut, fs, order=4):
     Returns:
     - `sos` : second-order representation of the IIR filter
     """
-    
     nyq = 0.5*fs
     low = lowcut/nyq
     high = highcut/nyq
@@ -141,7 +136,6 @@ def apply_butter_filter(data, lowcut, highcut, fs, order=4):
     Returns:
     - `y` : filtered data
     """
-    
     sos = create_butter_filter(lowcut,highcut,fs,order=order)
     y   = signal.sosfiltfilt(sos,data)
     
@@ -161,7 +155,6 @@ def create_firwin_filter(lowcut, highcut, fs, ntaps=255, window='hamming'):
     Returns:
     - `taps` : coefficients of length numtaps FIR filter
     """
-    
     nyq = 0.5*fs
     
     # band-pass
@@ -193,7 +186,6 @@ def apply_firwin_filter(data, lowcut, highcut, fs, ntaps=255, window='hamming'):
     Returns:
     - `y` : filtered data
     """
-    
     taps = create_firwin_filter(lowcut,highcut,fs,ntaps,window=window)
     y    = signal.filtfilt(taps,1,data)
     
@@ -217,7 +209,6 @@ def create_TL_A(Bx, By, Bz, add_induced=True, add_eddy=True, Bt_scale=50000):
     Returns:
     - `A` : Tolles-Lawson A matrix
     """
-
     Bt = np.sqrt(Bx**2 + By**2 + Bz**2)
     s  = Bt / Bt_scale # scale
     cosX, cosY, cosZ = Bx/Bt, By/Bt, Bz/Bt
@@ -272,7 +263,6 @@ def create_TL_coef(Bx, By, Bz, meas, add_induced=True, add_eddy=True, lowcut=0.1
     Returns:
     - `TL_coef`: Tolles-Lawson coefficients
     """
-    
     # apply filter to scalar measurements
     if filter_params[0] == 'Butterworth':
         meas_f = apply_butter_filter(meas,lowcut,highcut,fs,order=filter_params[1])
@@ -309,6 +299,23 @@ def create_TL_coef(Bx, By, Bz, meas, add_induced=True, add_eddy=True, lowcut=0.1
         TL_coef = np.linalg.inv(A_f_t.T.dot(A_f_t)+ridge*np.eye(np.shape(A_f_t)[1])).dot(A_f_t.T).dot(meas_f_t)
     
     return TL_coef
+
+
+def apply_TL(mag, TL_coef, A):
+    '''
+    Apply Tolles Lawson correction to scalar magnetometers.
+    
+    Arguments:
+    - `mag` : scalar magnetometer to be corrected
+    - `TL_coef` : Tolles-Lawson coefficients corresponding to the magnetometer to be corrected
+    - `A` : Tolles-Lawson A matrix
+    
+    Returns:
+    - `TL_mag` : Tolles-Lawson compensated magnetometer
+    '''
+    TL_mag = mag-np.dot(A,TL_coef)+np.mean(np.dot(A,TL_coef))
+    
+    return TL_mag
 
 
 #------------------------------#
