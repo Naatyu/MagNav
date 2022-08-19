@@ -86,16 +86,18 @@ target/
 /data/raw/Flt1007-train.h5
 /data/raw/readmes
 
-/data/interim/FLT_data_csv
-/data/interim/Sol_dataset_csv
+/data/interim/Flt_data_csv
 /data/interim/Flt_data.h5
-/data/interim/Sol_dataset.h5
-/data/interim/dataset_csv
-/data/interim/dataset.h5
-/data/interim/Chall_dataset.h5
-/data/interim/Chall_dataset_csv
 
-/src/models/Optuna_CNN-Copy1.py
+/data/processed/Chall_dataset_csv
+/data/processed/DownSelected_Dataset_csv
+/data/processed/DownSelected_Dataset_noigrf_csv
+/data/processed/Full_Dataset_csv
+/data/processed/Chall_dataset.h5
+/data/processed/DownSelected_Dataset.h5
+/data/processed/DownSelected_Dataset_noigrf.h5
+/data/processed/Full_Dataset.h5
+
 
 # Mac OS-specific storage files
 .DS_Store
