@@ -15,6 +15,7 @@ import os
 from datetime import datetime
 import time
 import math
+import psutil
 
 from models.CNN import CNN
 from models.RNN import Optuna_LSTM
@@ -49,15 +50,16 @@ class MagNavDataset(Dataset):
     '''
     Transform Pandas dataframe of flights data into a custom PyTorch dataset that returns the data into sequences of a desired length.
     '''
-    def __init__(self, df, seq_len, n_fold, split, truth='IGRFMAG1'):
+    def __init__(self, df, seq_len, split, train_lines, test_lines,truth='IGRFMAG1'):
         '''
         Initialization of the dataset.
         
         Arguments:
         - `df` : dataframe to transform in a custom PyTorch dataset
         - `seq_len` : length of a sequence
-        - `n_fold` : fold number
         - `split` : data split ('train' or 'test')
+        - `train_lines` : flight lines used for training
+        - `test_lines` : flight lines used for testing
         - `truth` : ground truth used as a reference for training the model ('IGRFMAG1' or 'COMPMAG1')
         
         Returns:
@@ -65,21 +67,8 @@ class MagNavDataset(Dataset):
         '''
         self.seq_len  = seq_len
         self.features = df.drop(columns=['LINE',truth]).columns.to_list()
-        
-        # Fold 0 - flights 1002, 1003, 1004 and 1006 for training and flight 1007 for testing
-        train_fold_0 = np.concatenate([dataset[2].LINE.unique(),dataset[3].LINE.unique(),dataset[4].LINE.unique(),dataset[6].LINE.unique()]).tolist()
-        test_fold_0  = dataset[7].LINE.unique().tolist()
-        
-        # Fold 1 - flights 1002, 1004, 1006 and 1007 for training and flight 1003 for testing
-        train_fold_1 = np.concatenate([dataset[2].LINE.unique(),dataset[4].LINE.unique(),dataset[6].LINE.unique(),dataset[7].LINE.unique()]).tolist()
-        test_fold_1  = dataset[3].LINE.unique().tolist()
-        
-        if n_fold == 0:
-            self.train_sections = train_fold_0
-            self.test_sections  = test_fold_0
-        elif n_fold == 1:
-            self.train_sections = train_fold_1
-            self.test_sections  = test_fold_1
+        self.train_sections = train_lines
+        self.test_sections = test_lines
         
         if split == 'train':
             
@@ -383,13 +372,22 @@ if __name__ == "__main__":
     #----Import data----#
     
     flights = {}
+    
+    # Flights to import
     flights_num = [2,3,4,6,7]
     
     for n in flights_num:
         df = pd.read_hdf('./data/processed/Flt_data.h5', key=f'Flt100{n}')
         flights[n] = df
     
-    print('Data import done.\n')
+    print(f'Data import done. Memory used {psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2:.2f} Mb')
+    
+    #----Slecting train/test lines----#
+    
+    train_lines = [np.concatenate([flights[2].LINE.unique(),flights[3].LINE.unique(),flights[4].LINE.unique(),flights[6].LINE.unique()]).tolist(),
+                   np.concatenate([flights[2].LINE.unique(),flights[4].LINE.unique(),flights[6].LINE.unique(),flights[7].LINE.unique()]).tolist()]
+    test_lines  = [flights[7].LINE.unique().tolist(),
+                   flights[3].LINE.unique().tolist()]
     
     #----Apply Tolles-Lawson----#
     
@@ -425,30 +423,36 @@ if __name__ == "__main__":
             flights[n]['TL_comp_mag4_cl'] = magnav.apply_TL(np.reshape(flights[n]['UNCOMPMAG4'].tolist(),(-1,1)), TL_coef_4, A)
             flights[n]['TL_comp_mag5_cl'] = magnav.apply_TL(np.reshape(flights[n]['UNCOMPMAG5'].tolist(),(-1,1)), TL_coef_5, A)
         
-        print('\nTolles-Lawson correction done.\n')
+        print(f'\nTolles-Lawson correction done. Memory used {psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2:.2f} Mb\n')
         
     #----Apply IGRF and diurnal corrections----#
     
     flights_cor = {}
+    
     if TL == 1:
-        mags_to_cor = ['TL_comp_mag3_cl', 'TL_comp_mag5_cl']
+        mags_to_cor = ['TL_comp_mag4_cl', 'TL_comp_mag5_cl']
     else:
-        mags_to_cor = ['UNCOMPMAG3', 'UNCOMPMAG5']
+        mags_to_cor = ['UNCOMPMAG4', 'UNCOMPMAG5']
     
     if COR == 0:
         flights_cor = flights.copy()
+        del flights
+        print(f'No correction done. Memory used {psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2:.2f} Mb')
     if COR == 1:
         for n in tqdm(flights_num):
             flights_cor[n] = apply_corrections(flights[n], mags_to_cor, diurnal=False, igrf=True)
-        print('\nIGRF correction done.')
+        del flights
+        print(f'IGRF correction done. Memory used {psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2:.2f} Mb')
     if COR == 2: 
         for n in tqdm(flights_num):
             flights_cor[n] = apply_corrections(flights[n], mags_to_cor, diurnal=True, igrf=False)
-        print('\nDiurnal correction done.')
+        del flights
+        print(f'Diurnal correction done. Memory used {psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2:.2f} Mb')
     if COR == 3:
         for n in tqdm(flights_num):
             flights_cor[n] = apply_corrections(flights[n], mags_to_cor, diurnal=True, igrf=True)
-        print('\nIGRF+Diurnal correction done.')
+        del flights
+        print(f'IGRF+Diurnal correction done. Memory used {psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2:.2f} Mb')
         
     #----Select features----#
     
@@ -460,23 +464,28 @@ if __name__ == "__main__":
     
     for n in flights_num:
         dataset[n] = flights_cor[n][features]
-        
-    print('Feature selection done.')
+    
+    del flights_cor
+    print(f'Feature selection done. Memory used {psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2:.2f} Mb')
+    
     
     #----Data scaling----#
     
-    # if SCALING == 0:
-    #     df = pd.concat([df2,df3,df4,df6,df7],ignore_index=True,axis=0)
-    #     scaling = ['None']
-    # elif SCALING == 2:
-    #     bound = [-1,1]
-    #     df2_scaled = MinMax_scaling(df2, bound=bound)
-    #     df3_scaled = MinMax_scaling(df3, bound=bound)
-    #     df4_scaled = MinMax_scaling(df4, bound=bound)
-    #     df6_scaled = MinMax_scaling(df6, bound=bound)
-    #     df7_scaled = MinMax_scaling(df7, bound=bound)
-    df = pd.concat([dataset[2],dataset[3],dataset[4],dataset[6],dataset[7]],ignore_index=True,axis=0)
-#         scaling = ['minmax',bound[0],bound[1],df3[TRUTH].min(),df3[TRUTH].max()]
+    dataset_scaled = {}
+    
+    if SCALING == 0:
+        df = pd.concat([dataset[2],dataset[3],dataset[4],dataset[6],dataset[7]],ignore_index=True,axis=0)
+        scaling = ['None']
+    elif SCALING == 2:
+        bound = [-1,1]
+        # for n in tqdm(flights_num):
+        # df2_scaled = MinMax_scaling(df2, bound=bound)
+        # df3_scaled = MinMax_scaling(df3, bound=bound)
+        # df4_scaled = MinMax_scaling(df4, bound=bound)
+        # df6_scaled = MinMax_scaling(df6, bound=bound)
+        # df7_scaled = MinMax_scaling(df7, bound=bound)
+        df = pd.concat([dataset[2],dataset[3],dataset[4],dataset[6],dataset[7]],ignore_index=True,axis=0)
+        scaling = ['minmax',bound[0],bound[1],df3[TRUTH].min(),df3[TRUTH].max()]
     # elif SCALING == 1:
     #     df2_scaled = Standard_scaling(df2)
     #     df3_scaled = Standard_scaling(df3)
@@ -486,7 +495,8 @@ if __name__ == "__main__":
     #     df = pd.concat([df2_scaled,df3_scaled,df4_scaled,df6_scaled,df7_scaled],ignore_index=True,axis=0)
     #     scaling = ['std']
     
-    print('Data scaling done.')
+    del dataset
+    print(f'Data scaling done. Memory used {psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2:.2f} Mb')
     
     #----Training----#
     
@@ -494,15 +504,15 @@ if __name__ == "__main__":
     test_loss_history = []
     last_test = []
     
-    for n_fold in range(2):
+    for fold in range(len(train_lines)):
         
         print('\n--------------------')
-        print(f'Fold number {n_fold}')
+        print(f'Fold number {fold}')
         print('--------------------\n')
         
         
-        train = MagNavDataset(df, seq_len=SEQ_LEN, n_fold=n_fold, split='train', truth=TRUTH)
-        test  = MagNavDataset(df, seq_len=SEQ_LEN, n_fold=n_fold, split='test', truth=TRUTH)
+        train = MagNavDataset(df, seq_len=SEQ_LEN, split='train', train_lines=train_lines[fold], test_lines=test_lines[fold], truth=TRUTH)
+        test  = MagNavDataset(df, seq_len=SEQ_LEN, split='test', train_lines=train_lines[fold], test_lines=test_lines[fold], truth=TRUTH)
 
         # Dataloaders
         train_loader  = DataLoader(train,
@@ -545,8 +555,8 @@ if __name__ == "__main__":
     print('\n-------------------------')
     print('Performance for all folds')
     print('-------------------------')
-    print(f'Fold 1 | RMSE = {np.sqrt(last_test[0]):.2f} nT')
-    print(f'Fold 2 | RMSE = {np.sqrt(last_test[1]):.2f} nT')
+    print(f'Fold 0 | RMSE = {np.sqrt(last_test[0]):.2f} nT')
+    print(f'Fold 1 | RMSE = {np.sqrt(last_test[1]):.2f} nT')
     print(f'Total  | RMSE = {np.sqrt(perf_folds):.2f} nT\n')
     
     # Saving the model and metrics
