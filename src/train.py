@@ -357,6 +357,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "-cor", "--corrections", type=int, required=False, default=3, help="Data correction, 0 for no corrections, 1 for IGRF correction, 2 for diurnal correction, 3 for IGRF+diurnal correction. Ex : --corrections 3", metavar=''
     )
+    parser.add_argument(
+        "-tl", "--tolleslawson", type=int, required=False, default=1, help="Apply Tolles-Lawson compensation to data, 0 for no compensation, 1 for compensation. Ex : --tolleslawson 1", metavar=''
+    )
+    parser.add_argument(
+        "-tr", "--truth", type=str, required=False, default='IGRFMAG1', help="Name of the variable corresponding to the truth for training the model. Ex : --truth 'IGRFMAG1'", metavar=''
+    )
     
     args = parser.parse_args()
     
@@ -366,6 +372,8 @@ if __name__ == "__main__":
     SEQ_LEN    = args.seq
     SCALING    = args.scaling
     COR        = args.corrections
+    TL         = args.tolleslawson
+    TRUTH      = args.truth
     
     if DEVICE == 'cuda':
         print(f'\nCurrently training on {torch.cuda.get_device_name(DEVICE)}')
@@ -373,17 +381,6 @@ if __name__ == "__main__":
         print('Currently training on cpu.')
 
     #----Import data----#
-
-    # df2 = pd.read_hdf('./data/processed/Chall_dataset.h5', key=f'Flt1002')
-    # df3 = pd.read_hdf('./data/processed/Chall_dataset.h5', key=f'Flt1003')
-    # df4 = pd.read_hdf('./data/processed/Chall_dataset.h5', key=f'Flt1004')
-    # df6 = pd.read_hdf('./data/processed/Chall_dataset.h5', key=f'Flt1006')
-    # df7 = pd.read_hdf('./data/processed/Chall_dataset.h5', key=f'Flt1007')
-    # df2 = pd.read_hdf('./data/processed/Flt_data.h5', key=f'Flt1002')
-    # df3 = pd.read_hdf('./data/processed/Flt_data.h5', key=f'Flt1003')
-    # df4 = pd.read_hdf('./data/processed/Flt_data.h5', key=f'Flt1004')
-    # df6 = pd.read_hdf('./data/processed/Flt_data.h5', key=f'Flt1006')
-    # df7 = pd.read_hdf('./data/processed/Flt_data.h5', key=f'Flt1007')
     
     flights = {}
     flights_num = [2,3,4,6,7]
@@ -406,51 +403,58 @@ if __name__ == "__main__":
     highcut = 0.9
     filt    = ['Butterworth',4]
     
-    for n in tqdm(flights_num):
-    
-        # A matrix of Tolles-Lawson
-        A = magnav.create_TL_A(flights[n]['FLUXB_X'],flights[n]['FLUXB_Y'],flights[n]['FLUXB_Z'])
+    if TL == 1:
+        for n in tqdm(flights_num):
 
-        # Tolles Lawson coefficients computation
-        TL_coef_4 = magnav.create_TL_coef(tl_pattern['FLUXB_X'],tl_pattern['FLUXB_Y'],tl_pattern['FLUXB_Z'],tl_pattern['UNCOMPMAG4'],
-                                      lowcut=lowcut,highcut=highcut,fs=fs,filter_params=filt)
-        TL_coef_5 = magnav.create_TL_coef(tl_pattern['FLUXB_X'],tl_pattern['FLUXB_Y'],tl_pattern['FLUXB_Z'],tl_pattern['UNCOMPMAG5'],
-                                      lowcut=lowcut,highcut=highcut,fs=fs,filter_params=filt)
+            # A matrix of Tolles-Lawson
+            A = magnav.create_TL_A(flights[n]['FLUXB_X'],flights[n]['FLUXB_Y'],flights[n]['FLUXB_Z'])
 
-        # Magnetometers correction
-        flights[n]['TL_comp_mag4_cl'] = magnav.apply_TL(np.reshape(flights[n]['UNCOMPMAG4'].tolist(),(-1,1)), TL_coef_4, A)
-        flights[n]['TL_comp_mag5_cl'] = magnav.apply_TL(np.reshape(flights[n]['UNCOMPMAG5'].tolist(),(-1,1)), TL_coef_5, A)
+            # Tolles Lawson coefficients computation
+            TL_coef_2 = magnav.create_TL_coef(tl_pattern['FLUXB_X'],tl_pattern['FLUXB_Y'],tl_pattern['FLUXB_Z'],tl_pattern['UNCOMPMAG2'],
+                                          lowcut=lowcut,highcut=highcut,fs=fs,filter_params=filt)
+            TL_coef_3 = magnav.create_TL_coef(tl_pattern['FLUXB_X'],tl_pattern['FLUXB_Y'],tl_pattern['FLUXB_Z'],tl_pattern['UNCOMPMAG3'],
+                                          lowcut=lowcut,highcut=highcut,fs=fs,filter_params=filt)
+            TL_coef_4 = magnav.create_TL_coef(tl_pattern['FLUXB_X'],tl_pattern['FLUXB_Y'],tl_pattern['FLUXB_Z'],tl_pattern['UNCOMPMAG4'],
+                                          lowcut=lowcut,highcut=highcut,fs=fs,filter_params=filt)
+            TL_coef_5 = magnav.create_TL_coef(tl_pattern['FLUXB_X'],tl_pattern['FLUXB_Y'],tl_pattern['FLUXB_Z'],tl_pattern['UNCOMPMAG5'],
+                                          lowcut=lowcut,highcut=highcut,fs=fs,filter_params=filt)
+
+            # Magnetometers correction
+            flights[n]['TL_comp_mag2_cl'] = magnav.apply_TL(np.reshape(flights[n]['UNCOMPMAG2'].tolist(),(-1,1)), TL_coef_2, A)
+            flights[n]['TL_comp_mag3_cl'] = magnav.apply_TL(np.reshape(flights[n]['UNCOMPMAG3'].tolist(),(-1,1)), TL_coef_3, A)
+            flights[n]['TL_comp_mag4_cl'] = magnav.apply_TL(np.reshape(flights[n]['UNCOMPMAG4'].tolist(),(-1,1)), TL_coef_4, A)
+            flights[n]['TL_comp_mag5_cl'] = magnav.apply_TL(np.reshape(flights[n]['UNCOMPMAG5'].tolist(),(-1,1)), TL_coef_5, A)
         
-    print('\nTolles-Lawson correction done.\n')
+        print('\nTolles-Lawson correction done.\n')
         
     #----Apply IGRF and diurnal corrections----#
     
     flights_cor = {}
-    mags_to_cor = ['TL_comp_mag4_cl', 'TL_comp_mag5_cl']
+    if TL == 1:
+        mags_to_cor = ['TL_comp_mag3_cl', 'TL_comp_mag5_cl']
+    else:
+        mags_to_cor = ['UNCOMPMAG3', 'UNCOMPMAG5']
     
     if COR == 0:
         flights_cor = flights.copy()
-        truth = 'COMPMAG1'
     if COR == 1:
         for n in tqdm(flights_num):
             flights_cor[n] = apply_corrections(flights[n], mags_to_cor, diurnal=False, igrf=True)
-        truth = 'IGRFMAG1'
+        print('\nIGRF correction done.')
     if COR == 2: 
         for n in tqdm(flights_num):
             flights_cor[n] = apply_corrections(flights[n], mags_to_cor, diurnal=True, igrf=False)
-        truth = 'DCMAG1'
+        print('\nDiurnal correction done.')
     if COR == 3:
         for n in tqdm(flights_num):
             flights_cor[n] = apply_corrections(flights[n], mags_to_cor, diurnal=True, igrf=True)
-        truth = 'IGRFMAG1'
-        
-    print('\nData correction done.')
+        print('\nIGRF+Diurnal correction done.')
         
     #----Select features----#
     
     # Always keep the 'LINE' feature in the feature list so that the MagNavDataset function can split the flight data
-    features = ['TL_comp_mag4_cl','TL_comp_mag5_cl','V_BAT1','V_BAT2',
-                    'INS_ACC_X','INS_ACC_Y','INS_ACC_Z','CUR_IHTR','PITCH','ROLL','AZIMUTH','LINE',truth]
+    features = [mags_to_cor[0],mags_to_cor[1],'V_BAT1','V_BAT2',
+                    'INS_ACC_X','INS_ACC_Y','INS_ACC_Z','CUR_IHTR','PITCH','ROLL','AZIMUTH','LINE',TRUTH]
     
     dataset = {}
     
@@ -472,7 +476,7 @@ if __name__ == "__main__":
     #     df6_scaled = MinMax_scaling(df6, bound=bound)
     #     df7_scaled = MinMax_scaling(df7, bound=bound)
     df = pd.concat([dataset[2],dataset[3],dataset[4],dataset[6],dataset[7]],ignore_index=True,axis=0)
-#         scaling = ['minmax',bound[0],bound[1],df3[truth].min(),df3[truth].max()]
+#         scaling = ['minmax',bound[0],bound[1],df3[TRUTH].min(),df3[TRUTH].max()]
     # elif SCALING == 1:
     #     df2_scaled = Standard_scaling(df2)
     #     df3_scaled = Standard_scaling(df3)
@@ -497,8 +501,8 @@ if __name__ == "__main__":
         print('--------------------\n')
         
         
-        train = MagNavDataset(df, seq_len=SEQ_LEN, n_fold=n_fold, split='train', truth=truth)
-        test  = MagNavDataset(df, seq_len=SEQ_LEN, n_fold=n_fold, split='test', truth=truth)
+        train = MagNavDataset(df, seq_len=SEQ_LEN, n_fold=n_fold, split='train', truth=TRUTH)
+        test  = MagNavDataset(df, seq_len=SEQ_LEN, n_fold=n_fold, split='test', truth=TRUTH)
 
         # Dataloaders
         train_loader  = DataLoader(train,
