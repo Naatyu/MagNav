@@ -67,12 +67,12 @@ class MagNavDataset(Dataset):
         self.features = df.drop(columns=['LINE',truth]).columns.to_list()
         
         # Fold 0 - flights 1002, 1003, 1004 and 1006 for training and flight 1007 for testing
-        train_fold_0 = np.concatenate([df2.LINE.unique(),df3.LINE.unique(),df4.LINE.unique(),df6.LINE.unique()]).tolist()
-        test_fold_0  = df7.LINE.unique().tolist()
+        train_fold_0 = np.concatenate([dataset[2].LINE.unique(),dataset[3].LINE.unique(),dataset[4].LINE.unique(),dataset[6].LINE.unique()]).tolist()
+        test_fold_0  = dataset[7].LINE.unique().tolist()
         
         # Fold 1 - flights 1002, 1004, 1006 and 1007 for training and flight 1003 for testing
-        train_fold_1 = np.concatenate([df4.LINE.unique(),df6.LINE.unique(),df7.LINE.unique(),df2.LINE.unique()]).tolist()
-        test_fold_1  = df3.LINE.unique().tolist()
+        train_fold_1 = np.concatenate([dataset[2].LINE.unique(),dataset[4].LINE.unique(),dataset[6].LINE.unique(),dataset[7].LINE.unique()]).tolist()
+        test_fold_1  = dataset[3].LINE.unique().tolist()
         
         if n_fold == 0:
             self.train_sections = train_fold_0
@@ -308,7 +308,7 @@ def apply_corrections(df,mags_to_cor,diurnal=True,igrf=True):
     lat  = df_cor['LAT']
     lon  = df_cor['LONG']
     h    = df_cor['BARO']*1e-3
-    date = datetime.datetime(2020, 6, 29) # Date on which the flights were made
+    date = datetime(2020, 6, 29) # Date on which the flights were made
     Be, Bn, Bu = magnav.igrf(lon,lat,h,date)
     
     if igrf == True:
@@ -365,9 +365,12 @@ if __name__ == "__main__":
     DEVICE     = args.device
     SEQ_LEN    = args.seq
     SCALING    = args.scaling
-    COR        = agrs.corrections
+    COR        = args.corrections
     
-    print(f'\nCurrently training on {torch.cuda.get_device_name(DEVICE)}')
+    if DEVICE == 'cuda':
+        print(f'\nCurrently training on {torch.cuda.get_device_name(DEVICE)}')
+    else:
+        print('Currently training on cpu.')
 
     #----Import data----#
 
@@ -389,6 +392,8 @@ if __name__ == "__main__":
         df = pd.read_hdf('./data/processed/Flt_data.h5', key=f'Flt100{n}')
         flights[n] = df
     
+    print('Data import done.\n')
+    
     #----Apply Tolles-Lawson----#
     
     # Get cloverleaf pattern data
@@ -401,7 +406,7 @@ if __name__ == "__main__":
     highcut = 0.9
     filt    = ['Butterworth',4]
     
-    for n in tqdm(flights_num)
+    for n in tqdm(flights_num):
     
         # A matrix of Tolles-Lawson
         A = magnav.create_TL_A(flights[n]['FLUXB_X'],flights[n]['FLUXB_Y'],flights[n]['FLUXB_Z'])
@@ -416,6 +421,8 @@ if __name__ == "__main__":
         flights[n]['TL_comp_mag4_cl'] = magnav.apply_TL(np.reshape(flights[n]['UNCOMPMAG4'].tolist(),(-1,1)), TL_coef_4, A)
         flights[n]['TL_comp_mag5_cl'] = magnav.apply_TL(np.reshape(flights[n]['UNCOMPMAG5'].tolist(),(-1,1)), TL_coef_5, A)
         
+    print('\nTolles-Lawson correction done.\n')
+        
     #----Apply IGRF and diurnal corrections----#
     
     flights_cor = {}
@@ -425,28 +432,32 @@ if __name__ == "__main__":
         flights_cor = flights.copy()
         truth = 'COMPMAG1'
     if COR == 1:
-        for n in flights_num:
+        for n in tqdm(flights_num):
             flights_cor[n] = apply_corrections(flights[n], mags_to_cor, diurnal=False, igrf=True)
         truth = 'IGRFMAG1'
     if COR == 2: 
-        for n in flights_num:
+        for n in tqdm(flights_num):
             flights_cor[n] = apply_corrections(flights[n], mags_to_cor, diurnal=True, igrf=False)
         truth = 'DCMAG1'
     if COR == 3:
-        for n in flights_num:
+        for n in tqdm(flights_num):
             flights_cor[n] = apply_corrections(flights[n], mags_to_cor, diurnal=True, igrf=True)
         truth = 'IGRFMAG1'
+        
+    print('\nData correction done.')
         
     #----Select features----#
     
     # Always keep the 'LINE' feature in the feature list so that the MagNavDataset function can split the flight data
-    features = ['TL_comp_mag3_cl','TL_comp_mag5_cl','V_BAT1','V_BAT2',
+    features = ['TL_comp_mag4_cl','TL_comp_mag5_cl','V_BAT1','V_BAT2',
                     'INS_ACC_X','INS_ACC_Y','INS_ACC_Z','CUR_IHTR','PITCH','ROLL','AZIMUTH','LINE',truth]
     
     dataset = {}
     
     for n in flights_num:
         dataset[n] = flights_cor[n][features]
+        
+    print('Feature selection done.')
     
     #----Data scaling----#
     
@@ -471,6 +482,8 @@ if __name__ == "__main__":
     #     df = pd.concat([df2_scaled,df3_scaled,df4_scaled,df6_scaled,df7_scaled],ignore_index=True,axis=0)
     #     scaling = ['std']
     
+    print('Data scaling done.')
+    
     #----Training----#
     
     train_loss_history = []
@@ -484,8 +497,8 @@ if __name__ == "__main__":
         print('--------------------\n')
         
         
-        train = MagNavDataset(df, seq_len=SEQ_LEN, n_fold=n_fold, split='train', truth='IGRFMAG1')
-        test  = MagNavDataset(df, seq_len=SEQ_LEN, n_fold=n_fold, split='test', truth='IGRFMAG1')
+        train = MagNavDataset(df, seq_len=SEQ_LEN, n_fold=n_fold, split='train', truth=truth)
+        test  = MagNavDataset(df, seq_len=SEQ_LEN, n_fold=n_fold, split='test', truth=truth)
 
         # Dataloaders
         train_loader  = DataLoader(train,
@@ -502,17 +515,17 @@ if __name__ == "__main__":
 
         # Model
 #         model = CNN(3,[16,32,64],[512,64],0.15,0.15,SEQ_LEN).to(DEVICE)
-#         model = CNN(SEQ_LEN,11).to(DEVICE)
-        num_LSTM    = 2                                                                   # Number of LSTM layers
-        hidden_size = [16,16]          # Hidden size by lstm layers
-        num_layers  = [15,5]           # Layers by lstm layers
-        num_linear  = 2                          # Number of fully connected layers
-        num_neurons = [64,12]       # Number of neurons for the FC layers
-        drop_lstm1  = 0                             # Drop for 1st LSTM layer
-        model = Optuna_LSTM(SEQ_LEN, drop_lstm1, hidden_size, num_layers, 
-                     num_LSTM, num_linear, num_neurons).to(DEVICE)
+        model = CNN(SEQ_LEN,11).to(DEVICE)
+        # num_LSTM    = 2                                                                   # Number of LSTM layers
+        # hidden_size = [16,16]          # Hidden size by lstm layers
+        # num_layers  = [15,5]           # Layers by lstm layers
+        # num_linear  = 2                          # Number of fully connected layers
+        # num_neurons = [64,12]       # Number of neurons for the FC layers
+        # drop_lstm1  = 0                             # Drop for 1st LSTM layer
+        # model = Optuna_LSTM(SEQ_LEN, drop_lstm1, hidden_size, num_layers, 
+        #              num_LSTM, num_linear, num_neurons).to(DEVICE)
 #         model = ResNet18().to(DEVICE)
-        model.name = 'LSTM'
+        # model.name = 'LSTM'
 
         # Loss
         criterion = torch.nn.MSELoss()
