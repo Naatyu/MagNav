@@ -226,14 +226,22 @@ def make_training(model, epochs, train_loader, test_loader, scaling=['None']):
                 # Gather data and report
                 test_running_loss += loss.item()
 
-            # Compute the loss of the batch and save it
-            preds = np.concatenate(preds)
-            RMSE = magnav.rmse(preds,test.y[SEQ_LEN:],False)
-            test_loss = test_running_loss / batch_index
-            test_loss_history.append(test_loss)
+        # Compute the loss of the batch and save it
+        preds = np.concatenate(preds)
+
+        if scaling[0] == 'None':
+            RMSE_epoch = magnav.rmse(preds,test.y[SEQ_LEN:],False)
+        elif scaling[0] == 'std':
+            RMSE_epoch = magnav.rmse(preds*scaling[2]+scaling[1],test.y[SEQ_LEN:]*scaling[2]+scaling[1],False)
+        elif scaling[0] == 'minmax':
+            RMSE_epoch = magnav.rmse(scaling[3]+((preds-scaling[1])*(scaling[4]-scaling[3])/(scaling[2]-scaling[1])),
+                               scaling[3]+((test.y[SEQ_LEN:]-scaling[1])*(scaling[4]-scaling[3])/(scaling[2]-scaling[1])),False)
+
+        test_loss = test_running_loss / batch_index
+        test_loss_history.append(test_loss)
 
         # Update epoch progress bar
-        epoch_bar.set_postfix(train_loss=train_loss,test_loss=test_loss,RMSE=RMSE,lr=optimizer.param_groups[0]['lr'])
+        epoch_bar.set_postfix(train_loss=train_loss,test_loss=test_loss,RMSE=RMSE_epoch,lr=optimizer.param_groups[0]['lr'])
         epoch_bar.update()
     print('\n')
     
@@ -254,8 +262,8 @@ def Standard_scaling(df):
     df_scaled['LINE'] = df['LINE']
 
     return df_scaled
-    
-    
+
+
 def MinMax_scaling(df, bound=[-1,1]):
     '''
     Apply min-max scaling to a pandas dataframe except for the 'LINE' feature.
@@ -299,13 +307,13 @@ def apply_corrections(df,mags_to_cor,diurnal=True,igrf=True):
     h    = df_cor['BARO']*1e-3
     date = datetime(2020, 6, 29) # Date on which the flights were made
     Be, Bn, Bu = magnav.igrf(lon,lat,h,date)
-    
+
     if igrf == True:
         df_cor[mag_measurements] = df_cor[mag_measurements]-np.reshape(np.sqrt(Be**2+Bn**2+Bu**2)[0],[-1,1])
 
     return df_cor
 
-    
+
 #------------#
 #----Main----#
 #------------#
@@ -422,13 +430,13 @@ if __name__ == "__main__":
             flights[n]['TL_comp_mag3_cl'] = magnav.apply_TL(np.reshape(flights[n]['UNCOMPMAG3'].tolist(),(-1,1)), TL_coef_3, A)
             flights[n]['TL_comp_mag4_cl'] = magnav.apply_TL(np.reshape(flights[n]['UNCOMPMAG4'].tolist(),(-1,1)), TL_coef_4, A)
             flights[n]['TL_comp_mag5_cl'] = magnav.apply_TL(np.reshape(flights[n]['UNCOMPMAG5'].tolist(),(-1,1)), TL_coef_5, A)
-        
+
         print(f'\nTolles-Lawson correction done. Memory used {psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2:.2f} Mb\n')
-        
+
     #----Apply IGRF and diurnal corrections----#
-    
+
     flights_cor = {}
-    
+
     if TL == 1:
         mags_to_cor = ['TL_comp_mag4_cl', 'TL_comp_mag5_cl']
     else:
@@ -453,7 +461,7 @@ if __name__ == "__main__":
             flights_cor[n] = apply_corrections(flights[n], mags_to_cor, diurnal=True, igrf=True)
         del flights
         print(f'IGRF+Diurnal correction done. Memory used {psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2:.2f} Mb')
-        
+    
     #----Select features----#
     
     # Always keep the 'LINE' feature in the feature list so that the MagNavDataset function can split the flight data
@@ -468,32 +476,60 @@ if __name__ == "__main__":
     del flights_cor
     print(f'Feature selection done. Memory used {psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2:.2f} Mb')
     
-    
     #----Data scaling----#
     
-    dataset_scaled = {}
-    
     if SCALING == 0:
-        df = pd.concat([dataset[2],dataset[3],dataset[4],dataset[6],dataset[7]],ignore_index=True,axis=0)
-        scaling = ['None']
+        df = pd.DataFrame()
+        for flight in flights_num:
+            df = pd.concat([df,dataset[flight]], ignore_index=True, axis=0)
+        
+        # Save scaling parameters
+        scaling = {}
+        for n in range(len(test_lines)):
+            scaling[n] = ['None']
+        
     elif SCALING == 2:
+        # Save scaling parameters
         bound = [-1,1]
-        # for n in tqdm(flights_num):
-        # df2_scaled = MinMax_scaling(df2, bound=bound)
-        # df3_scaled = MinMax_scaling(df3, bound=bound)
-        # df4_scaled = MinMax_scaling(df4, bound=bound)
-        # df6_scaled = MinMax_scaling(df6, bound=bound)
-        # df7_scaled = MinMax_scaling(df7, bound=bound)
-        df = pd.concat([dataset[2],dataset[3],dataset[4],dataset[6],dataset[7]],ignore_index=True,axis=0)
-        scaling = ['minmax',bound[0],bound[1],df3[TRUTH].min(),df3[TRUTH].max()]
-    # elif SCALING == 1:
-    #     df2_scaled = Standard_scaling(df2)
-    #     df3_scaled = Standard_scaling(df3)
-    #     df4_scaled = Standard_scaling(df4)
-    #     df6_scaled = Standard_scaling(df6)
-    #     df7_scaled = Standard_scaling(df7)
-    #     df = pd.concat([df2_scaled,df3_scaled,df4_scaled,df6_scaled,df7_scaled],ignore_index=True,axis=0)
-    #     scaling = ['std']
+        scaling = {}
+        df = pd.DataFrame()
+        for flight in flights_num:
+            df = pd.concat([df,dataset[flight]], ignore_index=True, axis=0)
+        for n in range(len(test_lines)):
+            mask = pd.Series(dtype=bool)
+            for line in test_lines[n]:
+                temp_mask = (df.LINE == line)
+                mask = temp_mask|mask
+            scaling[n] = ['minmax', bound[0], bound[1], df.loc[mask,TRUTH].min(), df.loc[mask,TRUTH].max()]
+        del mask, temp_mask, df
+        
+        # Apply Min-Max sacling to the dataset
+        for n in tqdm(flights_num):
+            dataset[n] = MinMax_scaling(dataset[n], bound=bound)
+        df = pd.DataFrame()
+        for flight in flights_num:
+            df = pd.concat([df,dataset[flight]], ignore_index=True, axis=0)
+
+    elif SCALING == 1:
+        # Save scaling parameters
+        scaling = {}
+        df = pd.DataFrame()
+        for flight in flights_num:
+            df = pd.concat([df,dataset[flight]], ignore_index=True, axis=0)
+        for n in range(len(test_lines)):
+            mask = pd.Series(dtype=bool)
+            for line in test_lines[n]:
+                temp_mask = (df.LINE == line)
+                mask = temp_mask|mask
+            scaling[n] = ['std', df.loc[mask,TRUTH].mean(), df.loc[mask,TRUTH].std()]
+        del mask, temp_mask, df
+        
+        # Apply Standard scaling to the dataset
+        for n in tqdm(flights_num):
+            dataset[n] = Standard_scaling(dataset[n])
+        df = pd.DataFrame()
+        for flight in flights_num:
+            df = pd.concat([df,dataset[flight]], ignore_index=True, axis=0)
     
     del dataset
     print(f'Data scaling done. Memory used {psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2:.2f} Mb')
@@ -509,7 +545,6 @@ if __name__ == "__main__":
         print('\n--------------------')
         print(f'Fold number {fold}')
         print('--------------------\n')
-        
         
         train = MagNavDataset(df, seq_len=SEQ_LEN, split='train', train_lines=train_lines[fold], test_lines=test_lines[fold], truth=TRUTH)
         test  = MagNavDataset(df, seq_len=SEQ_LEN, split='test', train_lines=train_lines[fold], test_lines=test_lines[fold], truth=TRUTH)
@@ -545,7 +580,7 @@ if __name__ == "__main__":
         criterion = torch.nn.MSELoss()
 
         # Training
-        train_loss, test_loss = make_training(model, EPOCHS, train_loader, test_loader)
+        train_loss, test_loss = make_training(model, EPOCHS, train_loader, test_loader, scaling[fold])
         train_loss_history.append(train_loss)
         test_loss_history.append(test_loss)
         last_test.append(test_loss[-1])
