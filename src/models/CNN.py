@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import math
 
 class CNN(torch.nn.Module):
 
-    def __init__(self,seq_length,in_channels):
+    def __init__(self,seq_len,in_channels):
         super(CNN,self).__init__()
 
         self.layers = torch.nn.Sequential(
@@ -15,7 +16,7 @@ class CNN(torch.nn.Module):
                       out_channels = 8,
                       kernel_size  = 3,
                       padding = 1),
-            nn.BatchNorm1d(8),
+            nn.LeakyReLU(),
             nn.Conv1d(in_channels  = 8,
                       out_channels = 16,
                       kernel_size  = 3,
@@ -24,9 +25,11 @@ class CNN(torch.nn.Module):
 
             # Linear layers
             nn.Flatten(),
-            nn.Linear(16*20,16),
-            nn.ReLU(),
-            nn.Linear(16,1))
+            nn.Linear(16*seq_len,16),
+            nn.LeakyReLU(),
+            nn.Linear(16,4),
+            nn.LeakyReLU(),
+            nn.Linear(4,1))
         
         nn.init.kaiming_normal_(self.layers[0].weight, nonlinearity='relu')
         nn.init.constant_(self.layers[0].bias, 0)
@@ -124,13 +127,13 @@ class ResNet(nn.Module):
     def __init__(self,block, num_blocks, num_classes=1):
         super(ResNet, self).__init__()
         self.in_planes = 64
-        self.conv1 = nn.Conv1d(17, 64, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv1 = nn.Conv1d(11, 64, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm1d(64)
         self.layer1 = self._make_layer(block, 64, num_blocks[0], stride=1)
         self.layer2 = self._make_layer(block, 128, num_blocks[1], stride=2)
         self.layer3 = self._make_layer(block, 256, num_blocks[2], stride=2)
         self.layer4 = self._make_layer(block, 512, num_blocks[3], stride=2)
-        self.linear = nn.Linear(3*512*block.expansion, num_classes)
+        self.linear = nn.Linear(2*512*block.expansion, num_classes)
         
     def _make_layer(self, block, planes, num_blocks, stride):
         strides = [stride] + [1]*(num_blocks-1)

@@ -2,6 +2,7 @@
 
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -17,9 +18,9 @@ import time
 import math
 import psutil
 
-from models.CNN import CNN
-from models.RNN import Optuna_LSTM
 import magnav
+from models.CNN import CNN, ResNet18
+from models.RNN import Optuna_LSTM
 
 
 #-----------------#
@@ -146,7 +147,9 @@ def make_training(model, epochs, train_loader, test_loader, scaling=['None']):
     - `test_loss_history` : history of loss values during testing
     '''
     # Optimizer
-    optimizer = torch.optim.Adam(model.parameters(),lr=1.5e-4)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0.5e-1)
+    lambda1 = lambda epoch: 0.999**epoch
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda1)
     
     # Create batch and epoch progress bar
     batch_bar = tqdm(total=len(train)//BATCH_SIZE,unit="batch",desc='Training',leave=False, position=0, ncols=150)
@@ -154,6 +157,7 @@ def make_training(model, epochs, train_loader, test_loader, scaling=['None']):
     
     train_loss_history = []
     test_loss_history = []
+    Best_RMSE = 9e9
 
     for epoch in range(epochs):
 
@@ -193,6 +197,9 @@ def make_training(model, epochs, train_loader, test_loader, scaling=['None']):
             # Update batch progess bar
             batch_bar.set_postfix(train_loss=train_running_loss/(batch_index+1),lr=optimizer.param_groups[0]['lr'])
             batch_bar.update()
+        
+        # Update learning rate
+        scheduler.step()
 
         # Compute the loss of the batch and save it
         train_loss = train_running_loss / batch_index
@@ -215,10 +222,11 @@ def make_training(model, epochs, train_loader, test_loader, scaling=['None']):
                 # Put data to the desired device (CPU or GPU)
                 inputs, labels = inputs.to(DEVICE), labels.to(DEVICE)
 
-                preds.append(model(inputs).cpu())
-
                 # Make prediction for this batch
                 predictions = model(inputs)
+                
+                # Save prediction for this batch
+                preds.append(predictions.cpu())
 
                 # Compute the loss
                 loss = criterion(predictions, labels)
@@ -239,13 +247,18 @@ def make_training(model, epochs, train_loader, test_loader, scaling=['None']):
 
         test_loss = test_running_loss / batch_index
         test_loss_history.append(test_loss)
+        
+        # Save best model
+        if Best_RMSE > RMSE_epoch:
+            Best_RMSE = RMSE_epoch
+            Best_model = model
 
         # Update epoch progress bar
         epoch_bar.set_postfix(train_loss=train_loss,test_loss=test_loss,RMSE=RMSE_epoch,lr=optimizer.param_groups[0]['lr'])
         epoch_bar.update()
     print('\n')
     
-    return train_loss_history, test_loss_history
+    return train_loss_history, test_loss_history, Best_RMSE, Best_model
 
 
 def Standard_scaling(df):
@@ -431,7 +444,9 @@ if __name__ == "__main__":
             flights[n]['TL_comp_mag4_cl'] = magnav.apply_TL(np.reshape(flights[n]['UNCOMPMAG4'].tolist(),(-1,1)), TL_coef_4, A)
             flights[n]['TL_comp_mag5_cl'] = magnav.apply_TL(np.reshape(flights[n]['UNCOMPMAG5'].tolist(),(-1,1)), TL_coef_5, A)
 
-        print(f'\nTolles-Lawson correction done. Memory used {psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2:.2f} Mb\n')
+        print(f'Tolles-Lawson correction done. Memory used {psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2:.2f} Mb')
+    else:
+        print(f'Tolles-Lawson correction done. Memory used {psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2:.2f} Mb')
 
     #----Apply IGRF and diurnal corrections----#
 
@@ -538,14 +553,16 @@ if __name__ == "__main__":
     
     train_loss_history = []
     test_loss_history = []
-    last_test = []
+    RMSE_history = []
     
+    # Cross validation with selected folds 
     for fold in range(len(train_lines)):
         
         print('\n--------------------')
         print(f'Fold number {fold}')
         print('--------------------\n')
         
+        # Split to train and test
         train = MagNavDataset(df, seq_len=SEQ_LEN, split='train', train_lines=train_lines[fold], test_lines=test_lines[fold], truth=TRUTH)
         test  = MagNavDataset(df, seq_len=SEQ_LEN, split='test', train_lines=train_lines[fold], test_lines=test_lines[fold], truth=TRUTH)
 
@@ -563,8 +580,13 @@ if __name__ == "__main__":
                                    pin_memory=False)
 
         # Model
-#         model = CNN(3,[16,32,64],[512,64],0.15,0.15,SEQ_LEN).to(DEVICE)
-        model = CNN(SEQ_LEN,11).to(DEVICE)
+#         model = CNN(SEQ_LEN,11).to(DEVICE)
+#         model.name = model.__class__.__name__
+
+        model = ResNet18().to(DEVICE)
+        model.name = model.__class__.__name__
+        
+        # model = CNN(3,[16,32,64],[512,64],0.15,0.15,SEQ_LEN).to(DEVICE)
         # num_LSTM    = 2                                                                   # Number of LSTM layers
         # hidden_size = [16,16]          # Hidden size by lstm layers
         # num_layers  = [15,5]           # Layers by lstm layers
@@ -573,60 +595,58 @@ if __name__ == "__main__":
         # drop_lstm1  = 0                             # Drop for 1st LSTM layer
         # model = Optuna_LSTM(SEQ_LEN, drop_lstm1, hidden_size, num_layers, 
         #              num_LSTM, num_linear, num_neurons).to(DEVICE)
-#         model = ResNet18().to(DEVICE)
         # model.name = 'LSTM'
 
-        # Loss
+        # Loss function
         criterion = torch.nn.MSELoss()
 
         # Training
-        train_loss, test_loss = make_training(model, EPOCHS, train_loader, test_loader, scaling[fold])
+        train_loss, test_loss, Best_RMSE, Best_model = make_training(model, EPOCHS, train_loader, test_loader, scaling[fold])
+        
+        # Save results from training
         train_loss_history.append(train_loss)
         test_loss_history.append(test_loss)
-        last_test.append(test_loss[-1])
+        RMSE_history.append(Best_RMSE)
         
-    perf_folds = sum(last_test)/2
-        
+        if fold == 0:
+            folder_path = f'models/{Best_model.name}_{scaling[0][0]}_TL{TL}_COR{COR}_{TRUTH}'
+            os.mkdir(folder_path)
+        torch.save(Best_model,folder_path+f'/{Best_model.name}_fold{fold}.pt')
+    
+    # Compute pre-processing+training time
+    end_time = time.time()-start_time
+    
+    # Compute global perf over all folds
+    perf_folds = sum(RMSE_history)/len(train_lines)
+    
+    # Print perf of training
     print('\n-------------------------')
     print('Performance for all folds')
     print('-------------------------')
-    print(f'Fold 0 | RMSE = {np.sqrt(last_test[0]):.2f} nT')
-    print(f'Fold 1 | RMSE = {np.sqrt(last_test[1]):.2f} nT')
-    print(f'Total  | RMSE = {np.sqrt(perf_folds):.2f} nT\n')
+    for n in range(len(test_lines)):
+        print(f'Fold {n} | RMSE = {RMSE_history[n]:.2f} nT')
+    print(f'Total  | RMSE = {perf_folds:.2f} nT')
     
-    # Saving the model and metrics
-    date = datetime.strftime(datetime.now(),'%y%m%d_%H%M')
-    folder_path = f'models/CNN_runs/{model.name}_{date}'
-    os.mkdir(folder_path)
+    # Show performance graphs
+    for fold in range(len(test_lines)):
+        fig, ax = plt.subplots(figsize=[10,4])
+        ax.plot(train_loss_history[fold], label='Train loss')
+        ax.plot(test_loss_history[fold], label='Test loss')
+        ax.set_title(f'Loss for fold {fold}')
+        ax.set_xlabel('Epoch')
+        plt.legend()
+        plt.savefig(folder_path+f'/losses_fold{fold}')
     
-    torch.save(model,folder_path+f'/{model.name}.pt')
+    # Save parameters
+    params = pd.DataFrame(columns=['seq_len','epochs','batch_size','training_time'])
+    params.loc[0,'seq_len'] = SEQ_LEN
+    params.loc[0,'epochs'] = EPOCHS
+    params.loc[0,'batch_size'] = BATCH_SIZE
+    params.loc[0,'training_time'] = end_time
+    params.to_csv(folder_path+f'/parameters.csv', index=False)
     
-    with open(folder_path+'/train_loss.txt','w') as f:
-        for item in train_loss_history:
-            f.write('%s\n' % item)
-        
-    with open(folder_path+'/test_loss.txt','w') as f:
-        for item in test_loss_history:
-            f.write('%s\n' % item)
-            
-    # Saving parameters in txt 
-    end_time = time.time()-start_time
-
-    with open(folder_path+'/parameters.txt','w') as f:
-        f.write(f'Epochs :\n{EPOCHS}\n\n')
-        f.write(f'Batch_size :\n{BATCH_SIZE}\n\n')
-        f.write(f'Loss :\n{criterion}\n\n')
-        f.write(f'Scaling :\n{scaling}\n\n')
-        f.write(f'Input_shape :\n{[train.__getitem__(0)[0].size()[0],train.__getitem__(0)[0].size()[1]]}\n\n')
-        f.write(f'Sequence_length :\n{SEQ_LEN}\n\n')
-        f.write(f'Training_device :\n{DEVICE}\n\n')
-        f.write(f'Execution_time :\n{end_time:.2f}s\n\n')
-        f.write(f'Architecture :\n{model}\n\n')
-        f.write(f'Features :\n{train.features}\n\n')
-        
     # Empty GPU ram and shutdown computer
     torch.cuda.empty_cache()
     
     if args.shut == True:
         os.system("shutdown")
-    
