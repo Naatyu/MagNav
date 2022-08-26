@@ -82,26 +82,23 @@ class LSTM(torch.nn.Module):
 # class LSTM(torch.nn.Module):
 #     def __init__(self, seq_len):
 #         super(LSTM, self).__init__()
-#         self.lstm1 = torch.nn.LSTM(seq_len, 64, 1, batch_first=True)
-#         self.dropout = torch.nn.Dropout(0.2)
-#         self.lstm2 = torch.nn.LSTM(64, 32, 2, batch_first=True)
-#         self.lstm3 = torch.nn.LSTM(32, 16, 2, batch_first=True)
-#         self.fc = torch.nn.Linear(16,1)
+#         self.lstm1 = torch.nn.LSTM(seq_len, 8, 1, batch_first=True)
+#         self.lstm2 = torch.nn.LSTM(8, 8, 2, batch_first=True)
+#         self.fc = torch.nn.Linear(8,1)
     
 #     def forward(self, x):
-#         h1 = torch.zeros(1, x.size(0), 64).to('cuda')
-#         c1 = torch.zeros(1, x.size(0), 64).to('cuda')
+#         h1 = torch.zeros(1, x.size(0), 8).to('cuda')
+#         c1 = torch.zeros(1, x.size(0), 8).to('cuda')
         
-#         h2 = torch.zeros(2, x.size(0), 32).to('cuda')
-#         c2 = torch.zeros(2, x.size(0), 32).to('cuda')
+#         h2 = torch.zeros(2, x.size(0), 8).to('cuda')
+#         c2 = torch.zeros(2, x.size(0), 8).to('cuda')
     
-#         h3 = torch.zeros(2, x.size(0), 16).to('cuda')
-#         c3 = torch.zeros(2, x.size(0), 16).to('cuda')
+# #         h3 = torch.zeros(2, x.size(0), 16).to('cuda')
+# #         c3 = torch.zeros(2, x.size(0), 16).to('cuda')
         
 #         out, hidden = self.lstm1(x, (h1,c1))
-#         out = self.dropout(out)
 #         out, hidden = self.lstm2(out, (h2,c2))
-#         out, hidden = self.lstm3(out, (h3,c3))
+# #         out, hidden = self.lstm3(out, (h3,c3))
 #         out = out[:, -1, :]
 #         out = self.fc(out)
         
@@ -180,7 +177,7 @@ class GRU(torch.nn.Module):
         self.num_layers = num_layers
         self.hidden_size = hidden_size
         self.gru = torch.nn.GRU(input_size, hidden_size, num_layers, batch_first=True)
-        self.dropout = torch.nn.Dropout(0.2)
+        self.dropout = torch.nn.Dropout(0)
         self.fc = torch.nn.Linear(hidden_size,1)
     
     def forward(self, x):

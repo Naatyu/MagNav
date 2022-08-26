@@ -20,7 +20,8 @@ import psutil
 
 import magnav
 from models.CNN import CNN, ResNet18
-from models.RNN import Optuna_LSTM
+from models.RNN import LSTM, GRU
+from models.MLP import MLP
 
 
 #-----------------#
@@ -147,8 +148,8 @@ def make_training(model, epochs, train_loader, test_loader, scaling=['None']):
     - `test_loss_history` : history of loss values during testing
     '''
     # Optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=0.5e-1)
-    lambda1 = lambda epoch: 0.999**epoch
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-2)
+    lambda1 = lambda epoch: 1**epoch
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda1)
     
     # Create batch and epoch progress bar
@@ -373,6 +374,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "-tr", "--truth", type=str, required=False, default='IGRFMAG1', help="Name of the variable corresponding to the truth for training the model. Ex : --truth 'IGRFMAG1'", metavar=''
     )
+    parser.add_argument(
+        "-ml", "--model", type=str, required=False, default='CNN', help="Name of the model to use. Available models : 'MLP', 'CNN', 'ResNet18', 'LSTM', 'GRU'. Ex : --model 'CNN'", metavar=''
+    )
+    parser.add_argument(
+        "-wd", "--weight_decay", type=float, required=False, default=0.001, help="Adam weight decay value. Ex : --weight_decay 0.00001", metavar=''
+    )
     
     args = parser.parse_args()
     
@@ -384,6 +391,8 @@ if __name__ == "__main__":
     COR        = args.corrections
     TL         = args.tolleslawson
     TRUTH      = args.truth
+    MODEL      = args.model
+    WEIGTH_DECAY = args.weight_decay
     
     if DEVICE == 'cuda':
         print(f'\nCurrently training on {torch.cuda.get_device_name(DEVICE)}')
@@ -422,6 +431,7 @@ if __name__ == "__main__":
     highcut = 0.9
     filt    = ['Butterworth',4]
     
+    ridge = 0.025
     if TL == 1:
         for n in tqdm(flights_num):
 
@@ -430,13 +440,13 @@ if __name__ == "__main__":
 
             # Tolles Lawson coefficients computation
             TL_coef_2 = magnav.create_TL_coef(tl_pattern['FLUXB_X'],tl_pattern['FLUXB_Y'],tl_pattern['FLUXB_Z'],tl_pattern['UNCOMPMAG2'],
-                                          lowcut=lowcut,highcut=highcut,fs=fs,filter_params=filt)
+                                          lowcut=lowcut,highcut=highcut,fs=fs,filter_params=filt,ridge=ridge)
             TL_coef_3 = magnav.create_TL_coef(tl_pattern['FLUXB_X'],tl_pattern['FLUXB_Y'],tl_pattern['FLUXB_Z'],tl_pattern['UNCOMPMAG3'],
-                                          lowcut=lowcut,highcut=highcut,fs=fs,filter_params=filt)
+                                          lowcut=lowcut,highcut=highcut,fs=fs,filter_params=filt,ridge=ridge)
             TL_coef_4 = magnav.create_TL_coef(tl_pattern['FLUXB_X'],tl_pattern['FLUXB_Y'],tl_pattern['FLUXB_Z'],tl_pattern['UNCOMPMAG4'],
-                                          lowcut=lowcut,highcut=highcut,fs=fs,filter_params=filt)
+                                          lowcut=lowcut,highcut=highcut,fs=fs,filter_params=filt,ridge=ridge)
             TL_coef_5 = magnav.create_TL_coef(tl_pattern['FLUXB_X'],tl_pattern['FLUXB_Y'],tl_pattern['FLUXB_Z'],tl_pattern['UNCOMPMAG5'],
-                                          lowcut=lowcut,highcut=highcut,fs=fs,filter_params=filt)
+                                          lowcut=lowcut,highcut=highcut,fs=fs,filter_params=filt,ridge=ridge)
 
             # Magnetometers correction
             flights[n]['TL_comp_mag2_cl'] = magnav.apply_TL(np.reshape(flights[n]['UNCOMPMAG2'].tolist(),(-1,1)), TL_coef_2, A)
@@ -580,22 +590,37 @@ if __name__ == "__main__":
                                    pin_memory=False)
 
         # Model
-#         model = CNN(SEQ_LEN,11).to(DEVICE)
-#         model.name = model.__class__.__name__
-
-        model = ResNet18().to(DEVICE)
-        model.name = model.__class__.__name__
+        if MODEL == 'MLP':
+            model = MLP(SEQ_LEN,11).to(DEVICE)
+            model.name = model.__class__.__name__
+        elif MODEL == 'CNN':
+            model = CNN(SEQ_LEN,11).to(DEVICE)
+            model.name = model.__class__.__name__
+        elif MODEL == 'ResNet18':
+            model = ResNet18().to(DEVICE)
+            model.name = model.__class__.__name__
+        elif MODEL == 'LSTM':
+            num_LSTM    = 2
+            hidden_size = [32,32]
+            num_layers  = [3,1]
+            num_linear  = 2
+            num_neurons = [16,4]
+            drop_lstm1 = 0
+            model = LSTM(SEQ_LEN, drop_lstm1, hidden_size, num_layers, num_LSTM, num_linear, num_neurons).to(DEVICE)
+            model.name = model.__class__.__name__
+        elif MODEL == 'GRU':
+            model = GRU(SEQ_LEN,11).to(DEVICE)
+            model.name = model.__class__.__name__
         
         # model = CNN(3,[16,32,64],[512,64],0.15,0.15,SEQ_LEN).to(DEVICE)
-        # num_LSTM    = 2                                                                   # Number of LSTM layers
-        # hidden_size = [16,16]          # Hidden size by lstm layers
-        # num_layers  = [15,5]           # Layers by lstm layers
-        # num_linear  = 2                          # Number of fully connected layers
-        # num_neurons = [64,12]       # Number of neurons for the FC layers
-        # drop_lstm1  = 0                             # Drop for 1st LSTM layer
-        # model = Optuna_LSTM(SEQ_LEN, drop_lstm1, hidden_size, num_layers, 
-        #              num_LSTM, num_linear, num_neurons).to(DEVICE)
-        # model.name = 'LSTM'
+#         num_LSTM    = 2                                                                   # Number of LSTM layers
+#         hidden_size = [16,16]          # Hidden size by lstm layers
+#         num_layers  = [8,5]           # Layers by lstm layers
+#         num_linear  = 2                          # Number of fully connected layers
+#         num_neurons = [16,4]       # Number of neurons for the FC layers
+#         drop_lstm1  = 0                             # Drop for 1st LSTM layer
+#         model = Optuna_LSTM(SEQ_LEN, drop_lstm1, hidden_size, num_layers, 
+#                      num_LSTM, num_linear, num_neurons).to(DEVICE)
 
         # Loss function
         criterion = torch.nn.MSELoss()
