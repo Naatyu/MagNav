@@ -54,8 +54,8 @@ class LSTM(torch.nn.Module):
         
         for k, lstm_k in enumerate(self.lstms):
             if k == 0:
-                h = torch.zeros(self.num_layers[k], x.size(0), self.hidden_size[k]).to('cuda')
-                c = torch.zeros(self.num_layers[k], x.size(0), self.hidden_size[k]).to('cuda')
+                h = torch.zeros(self.num_layers[k], x.size(0), self.hidden_size[k]).to('cpu')
+                c = torch.zeros(self.num_layers[k], x.size(0), self.hidden_size[k]).to('cpu')
 
                 out, _ = lstm_k(x, (h,c))
 #                 out = F.dropout(out,self.drop_lstm1)
@@ -65,8 +65,8 @@ class LSTM(torch.nn.Module):
                 out = lstm_k(out)
                 continue
                                    
-            h = torch.zeros(self.num_layers[k-1], x.size(0), self.hidden_size[k-1]).to('cuda')
-            c = torch.zeros(self.num_layers[k-1], x.size(0), self.hidden_size[k-1]).to('cuda')
+            h = torch.zeros(self.num_layers[k-1], x.size(0), self.hidden_size[k-1]).to('cpu')
+            c = torch.zeros(self.num_layers[k-1], x.size(0), self.hidden_size[k-1]).to('cpu')
 
             out, _ = lstm_k(out, (h,c))
         

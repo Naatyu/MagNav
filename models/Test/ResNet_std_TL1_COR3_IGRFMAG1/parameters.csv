@@ -1,0 +1,2 @@
+seq_len,epochs,batch_size,training_time
+80,300,256,59866.632847070694

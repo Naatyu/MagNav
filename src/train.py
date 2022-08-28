@@ -19,7 +19,7 @@ import math
 import psutil
 
 import magnav
-from models.CNN import CNN, ResNet18
+from models.CNN import CNN, ResNet18, Optuna_CNN
 from models.RNN import LSTM, GRU
 from models.MLP import MLP
 
@@ -148,8 +148,8 @@ def make_training(model, epochs, train_loader, test_loader, scaling=['None']):
     - `test_loss_history` : history of loss values during testing
     '''
     # Optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-2)
-    lambda1 = lambda epoch: 1**epoch
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=WEIGHT_DECAY)
+    lambda1 = lambda epoch: 0.9**epoch
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda1)
     
     # Create batch and epoch progress bar
@@ -392,7 +392,7 @@ if __name__ == "__main__":
     TL         = args.tolleslawson
     TRUTH      = args.truth
     MODEL      = args.model
-    WEIGTH_DECAY = args.weight_decay
+    WEIGHT_DECAY = args.weight_decay
     
     if DEVICE == 'cuda':
         print(f'\nCurrently training on {torch.cuda.get_device_name(DEVICE)}')
@@ -491,7 +491,7 @@ if __name__ == "__main__":
     
     # Always keep the 'LINE' feature in the feature list so that the MagNavDataset function can split the flight data
     features = [mags_to_cor[0],mags_to_cor[1],'V_BAT1','V_BAT2',
-                    'INS_ACC_X','INS_ACC_Y','INS_ACC_Z','CUR_IHTR','PITCH','ROLL','AZIMUTH','LINE',TRUTH]
+                    'INS_VEL_N','INS_VEL_V','INS_VEL_W','CUR_IHTR','CUR_FLAP','CUR_ACLo','CUR_TANK','PITCH','ROLL','AZIMUTH','BARO','LINE',TRUTH]
     
     dataset = {}
     
@@ -591,10 +591,11 @@ if __name__ == "__main__":
 
         # Model
         if MODEL == 'MLP':
-            model = MLP(SEQ_LEN,11).to(DEVICE)
+            model = MLP(SEQ_LEN,len(features)-2).to(DEVICE)
             model.name = model.__class__.__name__
         elif MODEL == 'CNN':
-            model = CNN(SEQ_LEN,11).to(DEVICE)
+            # model = CNN(SEQ_LEN,len(features)-2).to(DEVICE)
+            model = Optuna_CNN(SEQ_LEN,len(features)-2).to(DEVICE)
             model.name = model.__class__.__name__
         elif MODEL == 'ResNet18':
             model = ResNet18().to(DEVICE)
@@ -609,7 +610,7 @@ if __name__ == "__main__":
             model = LSTM(SEQ_LEN, drop_lstm1, hidden_size, num_layers, num_LSTM, num_linear, num_neurons).to(DEVICE)
             model.name = model.__class__.__name__
         elif MODEL == 'GRU':
-            model = GRU(SEQ_LEN,11).to(DEVICE)
+            model = GRU(SEQ_LEN,len(features)-2).to(DEVICE)
             model.name = model.__class__.__name__
         
         # model = CNN(3,[16,32,64],[512,64],0.15,0.15,SEQ_LEN).to(DEVICE)

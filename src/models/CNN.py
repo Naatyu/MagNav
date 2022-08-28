@@ -25,7 +25,7 @@ class CNN(torch.nn.Module):
 
             # Linear layers
             nn.Flatten(),
-            nn.Linear(seq_len*in_channels,16),
+            nn.Linear(16*seq_len,16),
             nn.LeakyReLU(),
             nn.Linear(16,4),
             nn.LeakyReLU(),
@@ -163,7 +163,7 @@ def ResNet18():
 
 class Optuna_CNN(torch.nn.Module):
 
-    def __init__(self,seq_length,n_features,n_convblock=2,filters=[32,64], num_neurons=[256,128]):
+    def __init__(self,seq_length,n_features,n_convblock=2,filters=[16,32], num_neurons=[64,8]):
         super(Optuna_CNN,self).__init__()
         
         # Raise Error if number of conv blocks don't match number of filters
@@ -201,8 +201,8 @@ class Optuna_CNN(torch.nn.Module):
             
 
         self.architecture.add_module('flatten',torch.nn.Flatten())
-#         self.architecture.add_module('linear_1',torch.nn.Linear(filters[-1]*math.floor(seq_length/(2**n_convblock)),num_neurons[0]))
-        self.architecture.add_module('linear_1',torch.nn.Linear(12*seq_length/2,num_neurons[0]))
+        self.architecture.add_module('linear_1',torch.nn.Linear(filters[-1]*math.floor(seq_length/(2**n_convblock)),num_neurons[0]))
+        # self.architecture.add_module('linear_1',torch.nn.Linear(n_features*seq_length/2,num_neurons[0]))
         self.architecture.add_module(f'relu_{n_convblock+1}',torch.nn.ReLU())
         self.architecture.add_module('linear_2',torch.nn.Linear(num_neurons[0],num_neurons[1]))
         self.architecture.add_module(f'relu_{n_convblock+2}',torch.nn.ReLU())
