@@ -36,49 +36,21 @@ You can also download the IGRF model [here](https://earth-planets-space.springer
 
 How to run the Notebooks ?
 ------------
-To be able to run the notebooks, you have to paste the downloaded flight data (1002, 1003, 1004, 1005, 1006, 1007 flights) in the raw folder. All that remains is to run the notebooks and python scripts in order and the additional data will be created automatically (all steps are in the notebooks). There is also a ```requirements.txt``` file, just open a terminal and go to the project folder and do ```pip install requirements.txt```. This will download the packages needed to run the project. It is highly recommended to create a virtual environment beforehand.
+To be able to run the notebooks, you have to paste the downloaded flight data (1002, 1003, 1004, 1005, 1006, 1007 flights) in the ```raw``` folder in ```data```. All that remains is to run the notebooks in order and the additional data will be created automatically (all steps are in the notebooks). There is also a ```requirements.txt``` file, just open a terminal and go to the project folder and do ```pip install requirements.txt```. This will download the packages needed to run the project.
 
 Project Organization
 ------------
 
     ├── LICENSE
-    ├── README.md          <- The top-level README of this project
+    ├── README.md          <- The top-level README of this project.
     ├── data
     │   ├── external       <- Data from third party sources.
-    │   ├── interim        <- Intermediate data that has been transformed.
     │   ├── processed      <- The final, canonical data sets for modeling.
     │   └── raw            <- The original, immutable data dump.
-    │
-    ├── docs               <- A default Sphinx project; see sphinx-doc.org for details (not implemented)
-    │
-    ├── models             <- Trained and serialized models, model predictions, or model summaries
-    │
-    ├── notebooks          <- Jupyter notebooks
-    │
+    ├── models             <- Trained models.
+    ├── notebooks          <- Jupyter notebooks.
     ├── references         <- Data dictionaries, manuals, and all other explanatory materials.
-    │
-    ├── reports            <- Generated analysis as HTML, PDF, LaTeX, etc. (not implemented)
-    │   └── figures        <- Generated graphics and figures to be used in reporting (not implemented)
-    │
-    ├── requirements.txt   <- The requirements file for reproducing the analysis environment, e.g.
-    │                         generated with `pip freeze > requirements.txt`
-    │
-    ├── setup.py           <- makes project pip installable (pip install -e .) so src can be imported (not implemented)
-    ├── src                <- Source code for use in this project.
-    │   ├── __init__.py    <- Makes src a Python module (not implemented)
-    │   │
-    │   ├── data           <- Scripts to download or generate data (not implemented)
-    │   │   └── make_dataset.py (not implemented)
-    │   │
-    │   ├── features       <- Scripts to turn raw data into features for modeling
-    │   │   └── .py (in construction)
-    │   │
-    │   ├── models         <- Scripts to train models and then use trained models to make
-    │   │   │                 predictions
-    │   │   └── .py (in construction)
-    │   │   
-    │   │
-    │   └── visualization  <- Scripts to create exploratory and results oriented visualizations (not implemented)
-    │       └── visualize.py (not implemented)
-    │
-    └── tox.ini            <- tox file with settings for running tox; see tox.readthedocs.io (not implemented)
+    ├── reports            <- Report in french and english of this work.
+    ├── requirements.txt   <- The requirements file for reproducing the analysis environment.
+    ├── src                <- Source code to train models.
+    │   ├── models         <- Code of models.
