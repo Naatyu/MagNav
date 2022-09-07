@@ -60,5 +60,5 @@ Performances
 
 Three main types of models were tested: MLP, CNN and LSTM. During the different tests, the CNN seems to be the most inetressing model allowing to obtain an RMSE of 23 nT on section 1007.06 of flight 1007. We can see the prediction of the CNN model in the figure below for flight 1007 :<br><br>
 ![cnn prediction](https://github.com/Naatyu/MagNav/blob/main/data/external/Images/cnn%20prediction%201007%20flight.png)
-<br>
+<br><br>
 For more information on performance comparisons, a full report is available in the ```reports``` section in french (original) and in english (translated with DeepL).
