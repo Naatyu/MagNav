@@ -1,4 +1,4 @@
-﻿Magnetic Navigation (currently in progress)
+﻿Magnetic Navigation
 ==============================
 Magnetic navigation project by Nathan Laoué
 
