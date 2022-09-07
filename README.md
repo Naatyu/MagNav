@@ -54,3 +54,9 @@ Project Organization
     ├── requirements.txt   <- The requirements file for reproducing the analysis environment.
     ├── src                <- Source code to train models.
     │   ├── models         <- Code of models.
+
+Performances
+------------
+
+Three main types of models were tested: MLP, CNN and LSTM. During the different tests, the CNN seems to be the most inetressing model allowing to obtain an RMSE of 23 nT on section 1007.06 of flight 1007. We can see the prediction of the model in the figure below :<br>
+![cnn prediction](https://github.com/[username]/[reponame]/blob/[branch]/image.jpg?raw=true)
