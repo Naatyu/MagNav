@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+#####################
+#  NOT WORKING NOW  #
+#####################
+
 import os
 import pandas as pd
 import numpy as np
@@ -13,6 +17,7 @@ from optuna.trial import TrialState
 from datetime import datetime
 import joblib
 import math
+from tqdm import tqdm
 
 from models.CNN import Optuna_CNN
 
@@ -38,17 +43,6 @@ def train(network, optimizer, seq_len, n_fold, batch_size):
         loss = F.mse_loss(output, target.to(device))                                  # Compute loss (Mean Squared Error)
         loss.backward()                                                               # Compute gradients
         optimizer.step()                                                              # Update weights
-        
-        
-def compute_SNR(truth_mag,pred_mag):
-    
-    error = pred_mag - truth_mag
-    std_truth = np.std(truth_mag)
-    std_error = np.std(error)
-    
-    SNR = std_truth / std_error
-    
-    return SNR  
 
 
 def validate(network,seq_len, n_fold, batch_size):
@@ -116,7 +110,7 @@ def objective(trial):
         if trial.should_prune():
             raise optuna.exceptions.TrialPruned()                                     # Prune training (if it is not promising)
             
-    total_RMSE = sum(fold_RMSE)/3
+    total_RMSE = sum(fold_RMSE)/2
 
     return total_RMSE
 
@@ -132,66 +126,87 @@ def trim_data(data,seq_length):
 
 
 class MagNavDataset(Dataset):
-    # split can be 'Train', 'Val', 'Test'
-    def __init__(self, df, seq_length, n_fold, split):
+    '''
+    Transform Pandas dataframe of flights data into a custom PyTorch dataset that returns the data into sequences of a desired length.
+    '''
+    def __init__(self, df, seq_len, split, train_lines, test_lines,truth='IGRFMAG1'):
+        '''
+        Initialization of the dataset.
         
-        self.seq_length = seq_length
+        Arguments:
+        - `df` : dataframe to transform in a custom PyTorch dataset
+        - `seq_len` : length of a sequence
+        - `split` : data split ('train' or 'test')
+        - `train_lines` : flight lines used for training
+        - `test_lines` : flight lines used for testing
+        - `truth` : ground truth used as a reference for training the model ('IGRFMAG1' or 'COMPMAG1')
         
-        # Get list of features
-        self.features = df.drop(columns=['LINE','IGRFMAG1']).columns.to_list()
-        
-        # Get train sections for fold n
-        train_fold_0 = np.concatenate([df2.LINE.unique(),df3.LINE.unique(),df4.LINE.unique(),df6.LINE.unique()]).tolist()
-        test_fold_0  = df7.LINE.unique().tolist()
-        
-        train_fold_2 = np.concatenate([df4.LINE.unique(),df6.LINE.unique(),df7.LINE.unique(),df2.LINE.unique()]).tolist()
-        test_fold_2  = df3.LINE.unique().tolist()
-        
-        if n_fold == 0:
-            self.train_sections = train_fold_0
-            self.test_sections = test_fold_0
-        elif n_fold == 1:
-            self.train_sections = train_fold_1
-            self.test_sections = test_fold_1
-        
+        Returns:
+        - None
+        '''
+        self.seq_len  = seq_len
+        self.features = df.drop(columns=['LINE',truth]).columns.to_list()
+        self.train_sections = train_lines
+        self.test_sections = test_lines
         
         if split == 'train':
             
+            # Create a mask to keep only training data
             mask_train = pd.Series(dtype=bool)
             for line in self.train_sections:
-                mask  = (df.LINE == line)
+                mask = (df.LINE == line)
                 mask_train = mask|mask_train
             
             # Split in X, y for training
-            X_train    = df.loc[mask_train,self.features]
-            y_train    = df.loc[mask_train,'IGRFMAG1']
+            X_train = df.loc[mask_train,self.features]
+            y_train = df.loc[mask_train,truth]
             
-            # Removing data that can't fit in full sequence and convert it to torch tensor
-            self.X = torch.t(trim_data(torch.tensor(X_train.to_numpy(),dtype=torch.float32),seq_length))
-            self.y = trim_data(torch.tensor(np.reshape(y_train.to_numpy(),[-1,1]),dtype=torch.float32),seq_length)
+            # Trim data and convert it to torch tensor
+            self.X = torch.t(trim_data(torch.tensor(X_train.to_numpy(),dtype=torch.float32),seq_len))
+            self.y = trim_data(torch.tensor(np.reshape(y_train.to_numpy(),[-1,1]),dtype=torch.float32),seq_len)
             
         elif split == 'test':
             
+            # Create a mask to keep only testing data
             mask_test = pd.Series(dtype=bool)
             for line in self.test_sections:
-                mask  = (df.LINE == line)
+                mask = (df.LINE == line)
                 mask_test = mask|mask_test
             
-            # Split in X, y for test
-            X_test      = df.loc[mask_test,self.features]
-            y_test      = df.loc[mask_test,'IGRFMAG1']
+            # Split in X, y for testing
+            X_test = df.loc[mask_test,self.features]
+            y_test = df.loc[mask_test,truth]
             
-            # Removing data that can't fit in full sequence and convert it to torch tensor
-            self.X = torch.t(trim_data(torch.tensor(X_test.to_numpy(),dtype=torch.float32),seq_length))
-            self.y = trim_data(torch.tensor(np.reshape(y_test.to_numpy(),[-1,1]),dtype=torch.float32),seq_length)
+            # Trim data and convert it to torch tensor
+            self.X = torch.t(trim_data(torch.tensor(X_test.to_numpy(),dtype=torch.float32),seq_len))
+            self.y = trim_data(torch.tensor(np.reshape(y_test.to_numpy(),[-1,1]),dtype=torch.float32),seq_len)
 
-    def __getitem__(self, index):
-        X = self.X[:,index:(index+self.seq_length)]
-        y = self.y[index+self.seq_length-1]
+    def __getitem__(self, idx):
+        '''
+        Return a sequence for a given index.
+        
+        Arguments:
+        - `idx` : index of a sequence
+        
+        Returns:
+        - `X` : sequence of features
+        - `y` : ground truth corresponding to the sequence
+        '''
+        X = self.X[:,idx:(idx+self.seq_len)]
+        y = self.y[idx+self.seq_len-1]
         return X, y
     
     def __len__(self):
-        return len(torch.t(self.X))-self.seq_length
+        '''
+        Return the numbers of sequences in the dataset.
+        
+        Arguments:
+        -None
+        
+        -Returns:
+        -number of sequences in the dataset
+        '''
+        return len(torch.t(self.X))-self.seq_len
 
 
 if __name__ == "__main__":
@@ -213,15 +228,101 @@ if __name__ == "__main__":
     random_seed = 27                                                                  # Make runs repeatable
     torch.backends.cudnn.enable = False                                               # Disable cuDNN use of nondeterministic algorithms (for repeatability)
     torch.manual_seed(random_seed)                                                    # Set torch seed
+
+    #----Import data----#
     
+    flights = {}
     
-    df2 = pd.read_hdf('./data/processed/Chall_dataset.h5', key=f'Flt1002')              # Import flight 1002
-    df3 = pd.read_hdf('./data/processed/Chall_dataset.h5', key=f'Flt1003')              # Import flight 1003
-    df4 = pd.read_hdf('./data/processed/Chall_dataset.h5', key=f'Flt1004')              # Import flight 1004
-    df6 = pd.read_hdf('./data/processed/Chall_dataset.h5', key=f'Flt1006')              # Import flight 1006
-    df7 = pd.read_hdf('./data/processed/Chall_dataset.h5', key=f'Flt1007')              # Import flight 1007
+    # Flights to import
+    flights_num = [2,3,4,6,7]
+    for n in flights_num:
+        df = pd.read_hdf('./data/processed/Flt_data.h5', key=f'Flt100{n}')
+    flights[n] = df
+
+    train_lines = [np.concatenate([flights[2].LINE.unique(),flights[3].LINE.unique(),flights[4].LINE.unique(),flights[6].LINE.unique()]).tolist(),
+                   np.concatenate([flights[2].LINE.unique(),flights[4].LINE.unique(),flights[6].LINE.unique(),flights[7].LINE.unique()]).tolist()]
+    test_lines  = [flights[7].LINE.unique().tolist(),
+                   flights[3].LINE.unique().tolist()]
+
+    #----Apply Tolles-Lawson----#
     
-    df_concat = pd.concat([df2,df3,df4,df6,df7], ignore_index=True, axis=0)           # Concatenate data
+    # Get cloverleaf pattern data
+    mask = (flights[2].LINE == 1002.20)
+    tl_pattern = flights[2][mask]
+
+    # filter parameters
+    fs      = 10.0
+    lowcut  = 0.1
+    highcut = 0.9
+    filt    = ['Butterworth',4]
+    
+    ridge = 0.025
+
+    for n in tqdm(flights_num):
+
+        # A matrix of Tolles-Lawson
+        A = magnav.create_TL_A(flights[n]['FLUXB_X'],flights[n]['FLUXB_Y'],flights[n]['FLUXB_Z'])
+
+        # Tolles Lawson coefficients computation
+        TL_coef_2 = magnav.create_TL_coef(tl_pattern['FLUXB_X'],tl_pattern['FLUXB_Y'],tl_pattern['FLUXB_Z'],tl_pattern['UNCOMPMAG2'],
+                                        lowcut=lowcut,highcut=highcut,fs=fs,filter_params=filt,ridge=ridge)
+        TL_coef_3 = magnav.create_TL_coef(tl_pattern['FLUXB_X'],tl_pattern['FLUXB_Y'],tl_pattern['FLUXB_Z'],tl_pattern['UNCOMPMAG3'],
+                                        lowcut=lowcut,highcut=highcut,fs=fs,filter_params=filt,ridge=ridge)
+        TL_coef_4 = magnav.create_TL_coef(tl_pattern['FLUXB_X'],tl_pattern['FLUXB_Y'],tl_pattern['FLUXB_Z'],tl_pattern['UNCOMPMAG4'],
+                                        lowcut=lowcut,highcut=highcut,fs=fs,filter_params=filt,ridge=ridge)
+        TL_coef_5 = magnav.create_TL_coef(tl_pattern['FLUXB_X'],tl_pattern['FLUXB_Y'],tl_pattern['FLUXB_Z'],tl_pattern['UNCOMPMAG5'],
+                                        lowcut=lowcut,highcut=highcut,fs=fs,filter_params=filt,ridge=ridge)
+
+        # Magnetometers correction
+        flights[n]['TL_comp_mag2_cl'] = magnav.apply_TL(np.reshape(flights[n]['UNCOMPMAG2'].tolist(),(-1,1)), TL_coef_2, A)
+        flights[n]['TL_comp_mag3_cl'] = magnav.apply_TL(np.reshape(flights[n]['UNCOMPMAG3'].tolist(),(-1,1)), TL_coef_3, A)
+        flights[n]['TL_comp_mag4_cl'] = magnav.apply_TL(np.reshape(flights[n]['UNCOMPMAG4'].tolist(),(-1,1)), TL_coef_4, A)
+        flights[n]['TL_comp_mag5_cl'] = magnav.apply_TL(np.reshape(flights[n]['UNCOMPMAG5'].tolist(),(-1,1)), TL_coef_5, A)
+
+    #----Apply IGRF and diurnal corrections----#
+
+    flights_cor = {}
+    mags_to_cor = ['TL_comp_mag4_cl', 'TL_comp_mag5_cl']
+
+    for n in tqdm(flights_num):
+        flights_cor[n] = apply_corrections(flights[n], mags_to_cor, diurnal=True, igrf=True)
+    
+    #----Select features----#
+    
+    # Always keep the 'LINE' feature in the feature list so that the MagNavDataset function can split the flight data
+    features = [mags_to_cor[0],mags_to_cor[1],'V_BAT1','V_BAT2',
+                    'INS_VEL_N','INS_VEL_V','INS_VEL_W','CUR_IHTR','CUR_FLAP','CUR_ACLo','CUR_TANK','PITCH','ROLL','AZIMUTH','BARO','LINE',TRUTH]
+    
+    dataset = {}
+    
+    for n in flights_num:
+        dataset[n] = flights_cor[n][features]
+    
+    del flights_cor
+    print(f'Feature selection done. Memory used {psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2:.2f} Mb')
+    
+    #----Data scaling----#
+
+    # Save scaling parameters
+    scaling = {}
+    df = pd.DataFrame()
+    for flight in flights_num:
+        df = pd.concat([df,dataset[flight]], ignore_index=True, axis=0)
+    for n in range(len(test_lines)):
+        mask = pd.Series(dtype=bool)
+        for line in test_lines[n]:
+            temp_mask = (df.LINE == line)
+            mask = temp_mask|mask
+        scaling[n] = ['std', df.loc[mask,TRUTH].mean(), df.loc[mask,TRUTH].std()]
+    del mask, temp_mask, df
+    
+    # Apply Standard scaling to the dataset
+    for n in tqdm(flights_num):
+        dataset[n] = Standard_scaling(dataset[n])
+    df = pd.DataFrame()
+    for flight in flights_num:
+        df = pd.concat([df,dataset[flight]], ignore_index=True, axis=0)
+
     
     date = datetime.strftime(datetime.now(),'%y%m%d_%H%M%S')
     study_name=f'study_{date}'

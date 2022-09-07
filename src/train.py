@@ -19,7 +19,7 @@ import math
 import psutil
 
 import magnav
-from models.CNN import CNN, ResNet18, Optuna_CNN
+from models.CNN import CNN, ResNet18
 from models.RNN import LSTM, GRU
 from models.MLP import MLP
 
@@ -594,8 +594,7 @@ if __name__ == "__main__":
             model = MLP(SEQ_LEN,len(features)-2).to(DEVICE)
             model.name = model.__class__.__name__
         elif MODEL == 'CNN':
-            # model = CNN(SEQ_LEN,len(features)-2).to(DEVICE)
-            model = Optuna_CNN(SEQ_LEN,len(features)-2).to(DEVICE)
+            model = CNN(SEQ_LEN,len(features)-2).to(DEVICE)
             model.name = model.__class__.__name__
         elif MODEL == 'ResNet18':
             model = ResNet18().to(DEVICE)
@@ -606,22 +605,11 @@ if __name__ == "__main__":
             num_layers  = [3,1]
             num_linear  = 2
             num_neurons = [16,4]
-            drop_lstm1 = 0
-            model = LSTM(SEQ_LEN, drop_lstm1, hidden_size, num_layers, num_LSTM, num_linear, num_neurons).to(DEVICE)
+            model = LSTM(SEQ_LEN, hidden_size, num_layers, num_LSTM, num_linear, num_neurons, DEVICE).to(DEVICE)
             model.name = model.__class__.__name__
         elif MODEL == 'GRU':
-            model = GRU(SEQ_LEN,len(features)-2).to(DEVICE)
+            model = GRU(SEQ_LEN,len(features)-2,3).to(DEVICE)
             model.name = model.__class__.__name__
-        
-        # model = CNN(3,[16,32,64],[512,64],0.15,0.15,SEQ_LEN).to(DEVICE)
-#         num_LSTM    = 2                                                                   # Number of LSTM layers
-#         hidden_size = [16,16]          # Hidden size by lstm layers
-#         num_layers  = [8,5]           # Layers by lstm layers
-#         num_linear  = 2                          # Number of fully connected layers
-#         num_neurons = [16,4]       # Number of neurons for the FC layers
-#         drop_lstm1  = 0                             # Drop for 1st LSTM layer
-#         model = Optuna_LSTM(SEQ_LEN, drop_lstm1, hidden_size, num_layers, 
-#                      num_LSTM, num_linear, num_neurons).to(DEVICE)
 
         # Loss function
         criterion = torch.nn.MSELoss()
@@ -671,8 +659,9 @@ if __name__ == "__main__":
     params.loc[0,'training_time'] = end_time
     params.to_csv(folder_path+f'/parameters.csv', index=False)
     
-    # Empty GPU ram and shutdown computer
+    # Empty GPU ram
     torch.cuda.empty_cache()
     
+    # Shutdown computer
     if args.shut == True:
         os.system("shutdown")

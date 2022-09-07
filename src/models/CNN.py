@@ -4,99 +4,83 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 
+
 class CNN(torch.nn.Module):
+    """
+    Class to create CNN model.
+    """
+    def __init__(self,seq_length,n_features,n_convblock=2,filters=[16,32], num_neurons=[64,8]):
+        """
+        Initialize the model.
 
-    def __init__(self,seq_len,in_channels):
+        Arguments:
+        - `seq_length`  : number of time steps in an input sequence
+        - `n_features`  : number of input features in the model
+        - `n_convblock` : number of desired convolutional blocks
+        - `filters`     : filters by convblocks (must be a list)
+        - `num_neurons` : number of neurons for linear layers (must be a list)
+
+        Returns:
+        - None
+        """
         super(CNN,self).__init__()
-
-        self.layers = torch.nn.Sequential(
-
-            # Conv layers
-            nn.Conv1d(in_channels  = in_channels,
-                      out_channels = 8,
-                      kernel_size  = 3,
-                      padding = 1),
-            nn.LeakyReLU(),
-            nn.Conv1d(in_channels  = 8,
-                      out_channels = 16,
-                      kernel_size  = 3,
-                      padding = 1),
-            nn.LeakyReLU(),
-
-            # Linear layers
-            nn.Flatten(),
-            nn.Linear(16*seq_len,16),
-            nn.LeakyReLU(),
-            nn.Linear(16,4),
-            nn.LeakyReLU(),
-            nn.Linear(4,1))
         
-        nn.init.kaiming_normal_(self.layers[0].weight, nonlinearity='relu')
-        nn.init.constant_(self.layers[0].bias, 0)
-        nn.init.kaiming_normal_(self.layers[2].weight, nonlinearity='relu')
-        nn.init.constant_(self.layers[2].bias, 0)
+        # Raise Error if number of conv blocks don't match number of filters
+        if type(filters) != list:
+            raise TypeError ("Filter should be a list (if only 1 filter put in 1 element list. Ex : filter = [8])")
 
+        if len(filters) != n_convblock:
+            raise ValueError ("Number of convolutional blocks and number of filters doesn't match")
+        
+        self.architecture = torch.nn.Sequential()
+        
+        for i in range(n_convblock):
 
+            if i == 0:
+                self.architecture.add_module(f'conv_{i+1}',
+                                            torch.nn.Conv1d(in_channels  = n_features,
+                                                            out_channels = filters[i],
+                                                            kernel_size  = 3,
+                                                            stride       = 1,
+                                                            padding      = 1,
+                                                            padding_mode = 'zeros'))
+                self.architecture.add_module(f'relu_{i+1}',torch.nn.ReLU())
+                self.architecture.add_module(f'maxpool_{i+1}',torch.nn.MaxPool1d(kernel_size = 2,stride = 2))
+                                             
+            else:
+                self.architecture.add_module(f'conv_{i+1}',
+                        torch.nn.Conv1d(in_channels  = filters[i-1],
+                                        out_channels = filters[i],
+                                        kernel_size  = 3,
+                                        stride       = 1,
+                                        padding      = 1,
+                                        padding_mode = 'zeros'))
+                self.architecture.add_module(f'relu_{i+1}',torch.nn.ReLU())
+                self.architecture.add_module(f'maxpool_{i+1}',torch.nn.MaxPool1d(kernel_size = 2,stride = 2))
+            
+
+        self.architecture.add_module('flatten',torch.nn.Flatten())
+        self.architecture.add_module('linear_1',torch.nn.Linear(filters[-1]*math.floor(seq_length/(2**n_convblock)),num_neurons[0]))
+        # self.architecture.add_module('linear_1',torch.nn.Linear(n_features*seq_length/2,num_neurons[0]))
+        self.architecture.add_module(f'relu_{n_convblock+1}',torch.nn.ReLU())
+        self.architecture.add_module('linear_2',torch.nn.Linear(num_neurons[0],num_neurons[1]))
+        self.architecture.add_module(f'relu_{n_convblock+2}',torch.nn.ReLU())
+        self.architecture.add_module('linear_3',torch.nn.Linear(num_neurons[1],1))
 
     def forward(self, x):
-        logits = self.layers(x)
+        """
+        Forward input sequence in the model.
+
+        Arguments:
+        - `x`  : input sequence
+
+        Returns:
+        - `logits` : model prediction
+        """
+        logits = self.architecture(x)
         return logits
-    
-# class CNN(nn.Module):
 
-    
-#     def __init__(self, num_conv_layers, num_filters, num_neurons, drop_conv1, drop_fc1, seq_len):
-
-#         super(CNN, self).__init__()                                                   # Initialize parent class
-#         in_size = 17                                                                  # Input features size
-#         kernel_size = 2                                                               # Conv filter size
-        
-#         # Define conv layers
-#         self.convs = nn.ModuleList([nn.Conv1d(in_size, num_filters[0], kernel_size)]) # List with the Conv layers
-#         out_size = seq_len - kernel_size + 1                                          # Size after conv layer
-#         out_size = int(out_size / 2)                                                  # Size after pooling
-        
-#         for i in range(1, num_conv_layers):
-#             self.convs.append(nn.Conv1d(num_filters[i-1], num_filters[i], kernel_size))
-#             out_size = out_size - kernel_size + 1                                     # Size after conv layer
-#             out_size = int(out_size / 2)                                              # Size after pooling
-        
-#         self.conv1_drop = nn.Dropout2d(p=drop_conv1)                                  # Dropout for conv1d
-#         self.out_feature = num_filters[num_conv_layers-1] * out_size                  # Size after flattened features
-        
-#         self.fc1 = nn.Linear(self.out_feature, num_neurons[0])                        # Fully connected layer 1
-#         self.fc2 = nn.Linear(num_neurons[0], num_neurons[-1])                         # Fully connected layer 2
-#         self.fc3 = nn.Linear(num_neurons[-1], 1)                                      # Fully connected layer 3
-        
-#         self.p1 = drop_fc1                                                            # Dropout ratio for FC1
-        
-#         # Initialize weights with He initialization
-#         for i in range(1, num_conv_layers):
-#             nn.init.kaiming_normal_(self.convs[i].weight, nonlinearity='relu')
-#             if self.convs[i].bias is not None:
-#                 nn.init.constant_(self.convs[i].bias, 0)
-#         nn.init.kaiming_normal_(self.fc1.weight, nonlinearity='relu')
-#         nn.init.kaiming_normal_(self.fc2.weight, nonlinearity='relu')
-    
-    
-#     def forward(self, x):
-        
-#         for i, conv_i in enumerate(self.convs):
-#             if i == 2:                                                                # Apply dropout at 2nd layer
-#                 x = F.relu(F.max_pool1d(self.conv1_drop(conv_i(x)),2))                # Apply conv_i, Dropout, max-pooling(kernel_size =2), ReLU
-#             else:
-#                 x = F.relu(F.max_pool1d(conv_i(x),2))                                 # Apply conv_i, max-pooling(kernel_size=2), ReLU
-        
-#         x = x.view(-1, self.out_feature)                                              # Flatten tensor
-#         x = F.relu(self.fc1(x))                                                       # Apply FC1, ReLU
-#         x = F.dropout(x, p=self.p1, training=self.training)                           # Apply Dropout after FC1 only when training
-#         x = F.relu(self.fc2(x))                                                       # Apply FC2, ReLU
-#         x = self.fc3(x)                                                               # Apply FC3
-        
-#         return x
-    
 # ResNet
-    
 class BasicBlock(nn.Module):
     expansion = 1
     
@@ -159,55 +143,3 @@ class ResNet(nn.Module):
 
 def ResNet18():
     return ResNet(BasicBlock, [2, 2, 2, 2])
-
-
-class Optuna_CNN(torch.nn.Module):
-
-    def __init__(self,seq_length,n_features,n_convblock=2,filters=[16,32], num_neurons=[64,8]):
-        super(Optuna_CNN,self).__init__()
-        
-        # Raise Error if number of conv blocks don't match number of filters
-        if type(filters) != list:
-            raise TypeError ("Filter should be a list (if only 1 filter put in 1 element list. Ex : filter = [8])")
-
-        if len(filters) != n_convblock:
-            raise ValueError ("Number of convolutional blocks and number of filters doesn't match")
-        
-        self.architecture = torch.nn.Sequential()
-        
-        for i in range(n_convblock):
-
-            if i == 0:
-                self.architecture.add_module(f'conv_{i+1}',
-                                            torch.nn.Conv1d(in_channels  = n_features,
-                                                            out_channels = filters[i],
-                                                            kernel_size  = 3,
-                                                            stride       = 1,
-                                                            padding      = 1,
-                                                            padding_mode = 'zeros'))
-                self.architecture.add_module(f'relu_{i+1}',torch.nn.ReLU())
-                self.architecture.add_module(f'maxpool_{i+1}',torch.nn.MaxPool1d(kernel_size = 2,stride = 2))
-                                             
-            else:
-                self.architecture.add_module(f'conv_{i+1}',
-                        torch.nn.Conv1d(in_channels  = filters[i-1],
-                                        out_channels = filters[i],
-                                        kernel_size  = 3,
-                                        stride       = 1,
-                                        padding      = 1,
-                                        padding_mode = 'zeros'))
-                self.architecture.add_module(f'relu_{i+1}',torch.nn.ReLU())
-                self.architecture.add_module(f'maxpool_{i+1}',torch.nn.MaxPool1d(kernel_size = 2,stride = 2))
-            
-
-        self.architecture.add_module('flatten',torch.nn.Flatten())
-        self.architecture.add_module('linear_1',torch.nn.Linear(filters[-1]*math.floor(seq_length/(2**n_convblock)),num_neurons[0]))
-        # self.architecture.add_module('linear_1',torch.nn.Linear(n_features*seq_length/2,num_neurons[0]))
-        self.architecture.add_module(f'relu_{n_convblock+1}',torch.nn.ReLU())
-        self.architecture.add_module('linear_2',torch.nn.Linear(num_neurons[0],num_neurons[1]))
-        self.architecture.add_module(f'relu_{n_convblock+2}',torch.nn.ReLU())
-        self.architecture.add_module('linear_3',torch.nn.Linear(num_neurons[1],1))
-
-    def forward(self, x):
-        logits = self.architecture(x)
-        return logits
