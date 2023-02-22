@@ -90,14 +90,7 @@ target/
 /data/processed/Flt_data.h5
 
 /data/processed_save
-#/data/processed/Chall_dataset_csv
-#/data/processed/DownSelected_Dataset_csv
-#/data/processed/DownSelected_Dataset_noigrf_csv
-#/data/processed/Full_Dataset_csv
-#/data/processed/Chall_dataset.h5
-#/data/processed/DownSelected_Dataset.h5
-#/data/processed/DownSelected_Dataset_noigrf.h5
-#/data/processed/Full_Dataset.h5
+venv
 
 
 # Mac OS-specific storage files

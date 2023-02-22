@@ -19,7 +19,7 @@ import math
 import psutil
 
 import magnav
-from models.CNN import CNN, ResNet18
+from models.CNN import Optuna_CNN, ResNet18
 from models.RNN import LSTM, GRU
 from models.MLP import MLP
 
@@ -623,7 +623,7 @@ if __name__ == "__main__":
         RMSE_history.append(Best_RMSE)
         
         if fold == 0:
-            folder_path = f'models/{Best_model.name}_{scaling[0][0]}_TL{TL}_COR{COR}_{TRUTH}'
+            folder_path = f'models/New_{Best_model.name}_{scaling[0][0]}_TL{TL}_COR{COR}_{TRUTH}'
             os.mkdir(folder_path)
         torch.save(Best_model,folder_path+f'/{Best_model.name}_fold{fold}.pt')
     

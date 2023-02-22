@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import math
 
 
-class CNN(torch.nn.Module):
+class Optuna_CNN(torch.nn.Module):
     """
     Class to create CNN model.
     """
@@ -23,7 +23,7 @@ class CNN(torch.nn.Module):
         Returns:
         - None
         """
-        super(CNN,self).__init__()
+        super(Optuna_CNN,self).__init__()
         
         # Raise Error if number of conv blocks don't match number of filters
         if type(filters) != list:
